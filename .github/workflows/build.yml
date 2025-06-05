@@ -87,7 +87,7 @@ jobs:
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_KEY }}
+          password: ${{ secrets.DEPLOY_PASSWORD }}
           script: |
             # 拉取新镜像
             docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.VERSION }}
