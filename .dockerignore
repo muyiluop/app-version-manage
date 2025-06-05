@@ -1,0 +1,27 @@
+# Git
+.git
+.gitignore
+
+# 前端
+frontend/node_modules
+frontend/dist
+frontend/.vscode
+frontend/npm-debug.log
+frontend/*.log
+
+# 后端
+backend/data/*.db
+backend/static/uploads/*
+backend/.vscode
+
+# 部署目录
+deploy/
+
+# IDE 配置
+.vscode/
+.idea/
+
+# 其他
+*.exe
+*.log
+*.swp

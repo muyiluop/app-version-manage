@@ -1,0 +1,67 @@
+# 前端相关
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr
+frontend/.env
+frontend/*.local
+
+# 后端相关
+backend/app_version_manage
+backend/app_version_manage.exe
+backend/static/uploads/*
+!backend/static/uploads/.gitkeep
+
+# 数据库文件
+backend/data/*.db
+
+# 部署目录
+deploy/*
+!deploy/nginx.conf
+!deploy/Dockerfile
+!deploy/entrypoint.sh
+
+# IDE 配置
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# 日志文件
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 环境文件
+.env
+.env.*
+!.env.example
+
+# 编译文件
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Go 相关
+go.work
+
+# 临时文件
+*.tmp
+*.temp
+*.bak
