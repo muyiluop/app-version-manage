@@ -504,7 +504,7 @@ const AppDetail: React.FC = () => {
             <Input placeholder="请输入模板名称" />
           </Form.Item>
           <Form.Item name="content" label="模板内容" rules={[{ required: true, message: "请输入模板内容" }]}>
-            <TextArea rows={6} placeholder="请输入模板内容，支持使用 ${app.*} 和 ${ver.*} 变量" />
+            <TextArea rows={6} placeholder="请输入模板内容，支持使用 {{.app.*}} 和 {{.ver.*}} 变量" />
           </Form.Item>
         </Form>
       </Modal>

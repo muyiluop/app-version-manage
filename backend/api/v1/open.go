@@ -217,8 +217,8 @@ func renderTemplate(templateContent string, app model.Application, version model
 	}
 
 	// 将模板内容中的 ${xxx} 转换为 Go template 语法 {{.xxx}}
-	templateContent = strings.ReplaceAll(templateContent, "${", "{{.")
-	templateContent = strings.ReplaceAll(templateContent, "}", "}}")
+	// templateContent = strings.ReplaceAll(templateContent, "${", "{{.")
+	// templateContent = strings.ReplaceAll(templateContent, "}", "}}")
 
 	// 解析模板
 	tmpl, err := template.New("output").Parse(templateContent)
