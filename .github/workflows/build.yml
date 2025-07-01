@@ -26,17 +26,17 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: https://gitea.com/actions/checkout@v4
+        uses: https://gitee.com/actions-mirror/checkout@v4
 
       - name: Set up Node.js
-        uses: https://gitea.com/actions/setup-node@v4
+        uses: https://gitee.com/actions-mirror/setup-node@v4
         with:
           node-version: "20"
           cache: "npm"
           cache-dependency-path: "frontend/package-lock.json"
 
       - name: Setup Go
-        uses: https://gitea.com/actions/setup-go@v4
+        uses: https://gitee.com/actions-mirror/setup-go@v4
         with:
           go-version: "1.24"
           cache-dependency-path: backend/go.sum
