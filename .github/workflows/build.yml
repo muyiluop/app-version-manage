@@ -26,7 +26,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: https://gitea.com/actions/checkout.git
+        uses: https://gitea.com/actions/checkout@v4
 
       - name: Set up Node.js
         uses: https://gitea.com/actions/setup-node@v4
