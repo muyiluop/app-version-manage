@@ -5,6 +5,7 @@ import (
 	"app_version_manage/model"
 	"app_version_manage/repository"
 	"bytes"
+	"encoding/json"
 	"log"
 	"net/http"
 	"strings"
@@ -195,6 +196,11 @@ func detectPlatform(userAgent string) string {
 // 渲染模板
 func renderTemplate(templateContent string, app model.Application, version model.Version) (string, error) {
 
+	ext := map[string]any{}
+	// 先判断字符串是否为空
+	if version.Ext != "" {
+		json.Unmarshal([]byte(version.Ext), &ext)
+	}
 	// 准备模板变量
 	data := map[string]any{
 		"app": map[string]any{
@@ -214,6 +220,7 @@ func renderTemplate(templateContent string, app model.Application, version model
 			"fileSize":  version.FileSize,
 			"createdAt": version.CreatedAt.Format(time.RFC3339),
 		},
+		"ext": ext,
 	}
 
 	// 将模板内容中的 ${xxx} 转换为 Go template 语法 {{.xxx}}

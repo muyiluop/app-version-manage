@@ -37,6 +37,7 @@ type Version struct {
 	FileSize    int64       `json:"fileSize" gorm:"not null"`
 	FileName    string      `json:"fileName" gorm:"size:255;not null"`
 	Changelog   string      `json:"changelog" gorm:"type:text"`
+	Ext         string      `json:"ext" gorm:"type:text"`
 	ForceUpdate bool        `json:"forceUpdate" gorm:"default:false"`
 	IsActive    bool        `json:"isActive" gorm:"default:true"`
 	CreatedAt   time.Time   `json:"createdAt"`

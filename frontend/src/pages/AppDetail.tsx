@@ -195,7 +195,12 @@ const AppDetail: React.FC = () => {
           platform: previewPlatform || undefined,
         },
       });
-      setPreviewContent(response.data);
+      // 如果是字符串直接预览，如果是json对象则先转为字符串
+      if (typeof response.data === "string") {
+        setPreviewContent(response.data);
+      } else {
+        setPreviewContent(JSON.stringify(response.data, null, 2));
+      }
     } catch (error: any) {
       setPreviewContent("");
     } finally {
@@ -367,6 +372,14 @@ const AppDetail: React.FC = () => {
     },
   ];
 
+  const isJson = (value: string) => {
+    try {
+      JSON.parse(value);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  };
   return (
     <div>
       <Card loading={loading}>
@@ -483,6 +496,29 @@ const AppDetail: React.FC = () => {
           <Form.Item name="changelog" label="更新日志">
             <TextArea rows={4} placeholder="请输入更新日志" />
           </Form.Item>
+          <Form.Item
+            name="ext"
+            label="扩展信息"
+            rules={[
+              {
+                validateTrigger: ["onBlur"],
+                validator: (_, value) => {
+                  console.log("value:", value);
+                  if (value == "") {
+                    return Promise.resolve();
+                  }
+                  if (isJson(value)) {
+                    return Promise.resolve();
+                  } else {
+                    return Promise.reject("请输入正确的json字符串");
+                  }
+                },
+              },
+            ]}
+            extra="可以输入json格式的key-value对用于存储自定义信息，将会在获取版本信息时返回"
+          >
+            <TextArea rows={4} placeholder={'示例：{"key": "value"}'} />
+          </Form.Item>
           <Form.Item name="forceUpdate" label="强制更新" valuePropName="checked">
             <Select>
               <Option value={false}>否</Option>
@@ -504,7 +540,7 @@ const AppDetail: React.FC = () => {
             <Input placeholder="请输入模板名称" />
           </Form.Item>
           <Form.Item name="content" label="模板内容" rules={[{ required: true, message: "请输入模板内容" }]}>
-            <TextArea rows={6} placeholder="请输入模板内容，支持使用 {{.app.*}} 和 {{.ver.*}} 变量" />
+            <TextArea rows={6} placeholder="请输入模板内容，支持使用 {{.app.*}} {{.ver.*}} {{.ext.*}} 变量" />
           </Form.Item>
         </Form>
       </Modal>
@@ -567,7 +603,7 @@ const AppDetail: React.FC = () => {
             name="content"
             label="模板内容"
             rules={[{ required: true, message: "请输入模板内容" }]}
-            extra="支持使用 ${app.*} 和 ${ver.*} 变量"
+            extra="支持使用 {{.app.*}}、{{.ver.*}}和{{.ext.*}} 变量"
           >
             <TextArea rows={12} />
           </Form.Item>

@@ -20,6 +20,7 @@ type CreateVersionRequest struct {
 	FileName    string         `json:"fileName" binding:"required"`
 	FileSize    int64          `json:"fileSize" binding:"required"`
 	Changelog   string         `json:"changelog"`
+	Ext         string         `json:"ext"`
 	ForceUpdate bool           `json:"forceUpdate"`
 }
 
@@ -53,6 +54,7 @@ func CreateVersion(c *gin.Context) {
 		FileName:    req.FileName,
 		FileSize:    req.FileSize,
 		Changelog:   req.Changelog,
+		Ext:         req.Ext,
 		ForceUpdate: req.ForceUpdate,
 		IsActive:    true,
 	}
@@ -123,6 +125,7 @@ func ListVersions(c *gin.Context) {
 	var versions []model.Version
 	if err := query.Offset((pagination.Page - 1) * pagination.PageSize).
 		Limit(pagination.PageSize).
+		Omit("ext").
 		Order("created_at DESC").
 		Find(&versions).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "获取版本列表失败"})
