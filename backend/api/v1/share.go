@@ -75,8 +75,18 @@ func GetSharedApp(c *gin.Context) {
 			userAgent := c.GetHeader("User-Agent")
 			platform = detectPlatform(userAgent)
 		}
+	} // 将versions中的文件地址修改为加密地址
+	for i := range versions {
+		if versions[i].FilePath != "" {
+			downloadToken, err := utils.GenerateSecureToken(versions[i].FilePath, 24*time.Hour)
+			if err != nil {
+				log.Printf("[Error] GetSharedAppVersions - 生成下载token失败: versionId=%d, error=%v", versions[i].ID, err)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "获取文件下载链接失败"})
+				return
+			}
+			versions[i].FilePath = downloadToken
+		}
 	}
-
 	c.JSON(http.StatusOK, gin.H{
 		"app": gin.H{
 			"name":        app.Name,

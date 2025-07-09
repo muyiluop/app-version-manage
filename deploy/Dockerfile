@@ -34,10 +34,10 @@ RUN apk --no-cache add ca-certificates tzdata && \
 RUN mkdir -p /app/static/uploads
 
 # 从前端构建阶段复制文件
-COPY www /app/www/
+COPY ./www /app
 
 # 从后端构建阶段复制文件
-COPY app ./
+COPY app /app/
 
 # 复制 nginx 配置
 COPY nginx.conf /etc/nginx/conf.d/default.conf
