@@ -152,7 +152,3 @@ curl "http://localhost:8080/api/open/latest?identifier=com.example.app&platform=
 许可证
 
 本项目采用 MIT License 开源协议，详见仓库根目录 LICENSE 文件。
-
-更多信息
-
-- 若需我把 README 翻译为英文、补充示例环境变量、或生成 `.env.example`、CI/CD 示例与更详细的 Docker multi-stage 构建脚本，我可以继续帮助完善。
