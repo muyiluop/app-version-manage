@@ -110,3 +110,30 @@ func AESGCMDecrypt(ciphertext []byte, key []byte) ([]byte, error) {
 
 	return plaintext, nil
 }
+
+// HashPassword 对密码进行加密（使用AES-GCM）
+func HashPassword(password string) (string, error) {
+	encrypted, err := AESGCMEncrypt([]byte(password), secretKey)
+	if err != nil {
+		return "", fmt.Errorf("密码加密失败: %v", err)
+	}
+	return base64.URLEncoding.EncodeToString(encrypted), nil
+}
+
+// VerifyPassword 验证密码
+func VerifyPassword(hashedPassword, password string) error {
+	encrypted, err := base64.URLEncoding.DecodeString(hashedPassword)
+	if err != nil {
+		return fmt.Errorf("密码格式错误: %v", err)
+	}
+
+	decrypted, err := AESGCMDecrypt(encrypted, secretKey)
+	if err != nil {
+		return fmt.Errorf("密码验证失败: %v", err)
+	}
+
+	if string(decrypted) != password {
+		return fmt.Errorf("密码错误")
+	}
+	return nil
+}

@@ -76,6 +76,19 @@ type User struct {
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
+// Share 应用分享信息
+type Share struct {
+	ID          uint        `json:"id" gorm:"primaryKey"`
+	AppID       uint        `json:"appId" gorm:"not null;index"`
+	Token       string      `json:"token" gorm:"size:255;unique;not null;index"`
+	Password    string      `json:"-" gorm:"size:100"` // 加密存储，可为空表示无密码
+	ExpiresAt   *time.Time  `json:"expiresAt"`         // 可为null表示永久有效
+	IsActive    bool        `json:"isActive" gorm:"default:true"`
+	CreatedAt   time.Time   `json:"createdAt"`
+	UpdatedAt   time.Time   `json:"updatedAt"`
+	Application Application `json:"-" gorm:"foreignKey:AppID"`
+}
+
 // PaginationQuery 分页查询参数
 type PaginationQuery struct {
 	Page     int `form:"page" binding:"required,min=1"`

@@ -33,6 +33,7 @@ func InitDB() error {
 		&model.Template{},
 		&model.File{},
 		&model.User{},
+		&model.Share{},
 	); err != nil {
 		return err
 	}

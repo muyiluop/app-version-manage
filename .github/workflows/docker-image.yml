@@ -6,9 +6,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version tag to build (overrides release tag)'
+        description: "Version tag to build (overrides release tag)"
         required: false
-        default: ''
+        default: ""
 
 jobs:
   build-and-push:
@@ -61,4 +61,5 @@ jobs:
             VERSION=${{ steps.vars.outputs.tag }}
 
       - name: Output image
-        run: echo "Image pushed: ghcr.io/${{ github.repository_owner }}/app-version-manage:${{ steps.vars.outputs.tag }}"
+        run: |
+          echo "Image pushed: ghcr.io/${{ github.repository_owner }}/app-version-manage:${{ steps.vars.outputs.tag }}"

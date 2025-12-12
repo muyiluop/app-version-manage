@@ -1,6 +1,22 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { Card, Typography, Button, List, Space, Tag, Empty, Skeleton, Drawer, Result, Descriptions } from "antd";
+import {
+  Card,
+  Typography,
+  Button,
+  List,
+  Space,
+  Tag,
+  Empty,
+  Skeleton,
+  Drawer,
+  Result,
+  Descriptions,
+  Modal,
+  Input,
+  Form,
+  message,
+} from "antd";
 import {
   DownloadOutlined,
   HistoryOutlined,
@@ -8,6 +24,7 @@ import {
   AppleOutlined,
   WindowsOutlined,
   AndroidOutlined,
+  LockOutlined,
 } from "@ant-design/icons";
 import axios from "axios";
 import { downloadFile, getFileUrl } from "../utils/file";
@@ -50,46 +67,85 @@ const AppShare: React.FC = () => {
   const [isHistoryVisible, setIsHistoryVisible] = useState(false);
   const [historyVersions, setHistoryVersions] = useState<Version[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [passwordInput, setPasswordInput] = useState("");
+  const [isPasswordModalVisible, setIsPasswordModalVisible] = useState(false);
+  const [accessGranted, setAccessGranted] = useState(false);
   const deviceType = getDeviceType();
+
+  // 会话内记忆密码：页面加载时尝试读取并自动授权
+  useEffect(() => {
+    const key = `share_password_${token}`;
+    const saved = sessionStorage.getItem(key);
+    if (saved) {
+      setPasswordInput(saved);
+      setAccessGranted(true);
+    }
+  }, [token]);
 
   // 加载应用信息
   useEffect(() => {
     const loadAppData = async () => {
       try {
         setLoading(true);
-        const response = await axios.get(`/share/${token}`);
+        const response = await axios.post(`/share/${token}`, {
+          password: accessGranted ? passwordInput : "",
+        });
+        if (response.data.requirePassword) {
+          // 需要密码验证
+          setIsPasswordModalVisible(true);
+          return;
+        }
         setApp(response.data.app);
         setVersions(response.data.versions);
         setCurrentPlatform(response.data.currentPlatform);
       } catch (error: any) {
-        setError(error.response?.data?.error || "加载失败");
+        if (error.response?.status === 209) {
+          // 需要密码验证
+          setIsPasswordModalVisible(true);
+        } else {
+          const errorMsg = error.response?.data?.error || "加载失败";
+          setError(errorMsg);
+          // 链接无效或过期等错误，清除已记录的密码
+          const key = `share_password_${token}`;
+          sessionStorage.removeItem(key);
+        }
       } finally {
         setLoading(false);
       }
     };
+
     loadAppData();
-  }, [token]);
+  }, [token, accessGranted]);
 
   // 加载版本历史
   const loadHistoryVersions = async (platform?: string) => {
     try {
       setHistoryLoading(true);
-      const response = await axios.get(`/share/${token}/versions`, {
-        params: { platform },
-      });
+      const response = await axios.post(
+        `/share/${token}/versions`,
+        { password: passwordInput },
+        { params: { platform } }
+      );
       setHistoryVersions(response.data.list);
-    } catch (error) {
-      // 忽略错误
+    } catch (error: any) {
+      message.error(error.response?.data?.error || "加载版本历史失败");
     } finally {
       setHistoryLoading(false);
     }
   };
 
-  // 获取当前平台的版本
-  const currentVersion = versions.find((v) => v.platform === currentPlatform);
-
-  // 过滤其他平台的版本
-  const otherPlatforms = versions.filter((v) => v.platform !== currentPlatform);
+  // 处理密码提交
+  const handlePasswordSubmit = () => {
+    if (!passwordInput) {
+      message.error("请输入密码");
+      return;
+    }
+    // 记住密码到会话存储，避免本次会话内重复输入
+    const key = `share_password_${token}`;
+    sessionStorage.setItem(key, passwordInput);
+    setAccessGranted(true);
+    setIsPasswordModalVisible(false);
+  };
   const handleDownloadVersion = (version: Version) => {
     downloadFile(version.filePath, version.fileName, true);
   };
@@ -102,9 +158,50 @@ const AppShare: React.FC = () => {
     );
   }
 
+  // 需要密码验证时，只显示密码框
+  if (isPasswordModalVisible && !app) {
+    return (
+      <Modal
+        title={
+          <Space>
+            <LockOutlined />
+            <span>输入访问密码</span>
+          </Space>
+        }
+        open={isPasswordModalVisible}
+        onCancel={() => setIsPasswordModalVisible(false)}
+        footer={[
+          <Button key="cancel" onClick={() => setIsPasswordModalVisible(false)}>
+            取消
+          </Button>,
+          <Button key="submit" type="primary" onClick={handlePasswordSubmit}>
+            提交
+          </Button>,
+        ]}
+      >
+        <Form layout="vertical">
+          <Form.Item label="密码" required>
+            <Input.Password
+              placeholder="请输入分享密码"
+              value={passwordInput}
+              onChange={(e) => setPasswordInput(e.target.value)}
+              onPressEnter={handlePasswordSubmit}
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
+    );
+  }
+
   if (error || !app) {
     return <Result status="404" title="访问失败" subTitle={error || "分享链接无效或已过期"} />;
   }
+
+  // 获取当前平台的版本
+  const currentVersion = versions.find((v) => v.platform === currentPlatform);
+
+  // 过滤其他平台的版本
+  const otherPlatforms = versions.filter((v) => v.platform !== currentPlatform);
 
   return (
     <div style={{ maxWidth: 1200, margin: "0 auto", padding: deviceType === "mobile" ? "16px" : "24px" }}>

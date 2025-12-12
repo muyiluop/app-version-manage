@@ -1,11 +1,33 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { Card, Tabs, Table, Button, Modal, Form, Input, Select, Upload, Space, Descriptions, Tag } from "antd";
-import { PlusOutlined, UploadOutlined, EditOutlined, ShareAltOutlined } from "@ant-design/icons";
+import {
+  Card,
+  Tabs,
+  Table,
+  Button,
+  Modal,
+  Form,
+  Input,
+  Select,
+  Upload,
+  Space,
+  Descriptions,
+  Tag,
+  InputNumber,
+  Popconfirm,
+} from "antd";
+import {
+  PlusOutlined,
+  UploadOutlined,
+  EditOutlined,
+  LinkOutlined,
+  DeleteOutlined,
+  StopOutlined,
+} from "@ant-design/icons";
 import { showMessage } from "../utils/message";
 import type { TabsProps } from "antd";
 import type { UploadProps } from "antd";
-import type { Application, Version, Template } from "../types";
+import type { Application, Version, Template, Share } from "../types";
 import axios from "axios";
 import { getFileUrl } from "../utils/file";
 
@@ -20,11 +42,16 @@ const AppDetail: React.FC = () => {
   const [app, setApp] = useState<Application | null>(null);
   const [versions, setVersions] = useState<Version[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
+  const [shares, setShares] = useState<Share[]>([]);
+  const [isShareEditVisible, setIsShareEditVisible] = useState(false);
+  const [shareEditForm] = Form.useForm();
+  const [editingShare, setEditingShare] = useState<Share | null>(null);
   const [loading, setLoading] = useState(false);
   const [isVersionModalVisible, setIsVersionModalVisible] = useState(false);
   const [isTemplateModalVisible, setIsTemplateModalVisible] = useState(false);
   const [isTemplateEditVisible, setIsTemplateEditVisible] = useState(false);
   const [isTemplatePreviewVisible, setIsTemplatePreviewVisible] = useState(false);
+  const [isShareModalVisible, setIsShareModalVisible] = useState(false);
   const [previewContent, setPreviewContent] = useState<string>("");
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewPlatform, setPreviewPlatform] = useState<string>("");
@@ -32,6 +59,7 @@ const AppDetail: React.FC = () => {
   const [versionForm] = Form.useForm();
   const [templateForm] = Form.useForm();
   const [templateEditForm] = Form.useForm();
+  const [shareForm] = Form.useForm();
   const [editForm] = Form.useForm();
   const [pagination, setPagination] = useState({ current: 1, pageSize: 10, total: 0 });
   const [selectedPlatform, setSelectedPlatform] = useState<string>("");
@@ -63,12 +91,14 @@ const AppDetail: React.FC = () => {
   const loadAppData = async () => {
     try {
       setLoading(true);
-      const [appResponse, templatesResponse] = await Promise.all([
+      const [appResponse, templatesResponse, sharesResponse] = await Promise.all([
         axios.get(`/apps/${id}`),
         axios.get(`/templates?appId=${id}`),
+        axios.get(`/apps/${id}/shares`),
       ]);
       setApp(appResponse.data);
       setTemplates(templatesResponse.data);
+      setShares(sharesResponse.data.shares || []);
       await loadVersions();
     } catch (error) {
       showMessage.error("加载应用信息失败");
@@ -243,6 +273,78 @@ const AppDetail: React.FC = () => {
     }
   };
 
+  const handleCreateShare = async (values: any) => {
+    try {
+      const response = await axios.post(`/apps/${id}/share`, {
+        password: values.password || "",
+        expiresIn: values.expiresIn || 0,
+      });
+      const shareUrl = `${window.location.origin}/share/${response.data.token}`;
+      Modal.success({
+        title: "分享链接已生成",
+        content: (
+          <div>
+            <p>分享链接已生成，请复制下方链接分享：</p>
+            <Input.TextArea value={shareUrl} autoSize readOnly onClick={(e) => e.currentTarget.select()} />
+            {values.hasPassword && <p style={{ marginTop: 8, color: "#666" }}>访问密码：{values.password}</p>}
+            {values.expiresIn > 0 && <p style={{ marginTop: 8, color: "#666" }}>有效期：{values.expiresIn}天</p>}
+          </div>
+        ),
+      });
+      setIsShareModalVisible(false);
+      shareForm.resetFields();
+      loadAppData();
+    } catch (error: any) {
+      showMessage.error(error.response?.data?.error || "生成分享链接失败");
+    }
+  };
+
+  const handleDeactivateShare = async (shareId: number) => {
+    try {
+      await axios.put(`/apps/${id}/shares/${shareId}/deactivate`);
+      showMessage.success("分享已禁用");
+      loadAppData();
+    } catch (error: any) {
+      showMessage.error(error.response?.data?.error || "禁用分享失败");
+    }
+  };
+
+  const handleDeleteShare = async (shareId: number) => {
+    try {
+      await axios.delete(`/apps/${id}/shares/${shareId}`);
+      showMessage.success("分享已删除");
+      loadAppData();
+    } catch (error: any) {
+      showMessage.error(error.response?.data?.error || "删除分享失败");
+    }
+  };
+
+  const handleUpdateShare = async (values: any) => {
+    if (!editingShare) return;
+    try {
+      const payload: any = {};
+      if (values.password !== undefined) {
+        payload.password = values.password; // 空字符串将清除密码
+      }
+      if (values.expiresIn !== undefined) {
+        payload.expiresIn = values.expiresIn; // 0 表示永久有效
+      }
+      await axios.put(`/apps/${id}/shares/${editingShare.id}`, payload);
+      showMessage.success("更新分享成功");
+      setIsShareEditVisible(false);
+      setEditingShare(null);
+      shareEditForm.resetFields();
+      loadAppData();
+    } catch (error: any) {
+      showMessage.error(error.response?.data?.error || "更新分享失败");
+    }
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    showMessage.success("已复制到剪贴板");
+  };
+
   const versionColumns = [
     {
       title: "版本号",
@@ -327,6 +429,104 @@ const AppDetail: React.FC = () => {
     },
   ];
 
+  const shareColumns = [
+    {
+      title: "分享令牌",
+      key: "token",
+      render: (_: any, record: Share) => (
+        <Space size="small">
+          <span
+            style={{
+              fontSize: "12px",
+              fontFamily: "monospace",
+              maxWidth: "150px",
+              display: "block",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {record.token.substring(0, 20)}...
+          </span>
+          <Button
+            type="text"
+            size="small"
+            icon={<LinkOutlined />}
+            onClick={() => copyToClipboard(`${window.location.origin}/share/${record.token}`)}
+            title="复制分享链接"
+          />
+        </Space>
+      ),
+    },
+    {
+      title: "密码保护",
+      key: "hasPassword",
+      render: (_: any, record: Share) => (record.hasPassword ? <Tag color="red">已设置</Tag> : <Tag>无</Tag>),
+    },
+    {
+      title: "有效期",
+      key: "expiresAt",
+      render: (_: any, record: Share) =>
+        record.expiresAt ? new Date(record.expiresAt).toLocaleDateString() : <Tag color="green">永久有效</Tag>,
+    },
+    {
+      title: "状态",
+      key: "isActive",
+      render: (_: any, record: Share) =>
+        record.isActive ? <Tag color="green">已启用</Tag> : <Tag color="red">已禁用</Tag>,
+    },
+    {
+      title: "创建时间",
+      dataIndex: "createdAt",
+      key: "createdAt",
+      render: (text: string) => new Date(text).toLocaleString(),
+    },
+    {
+      title: "操作",
+      key: "action",
+      render: (_: any, record: Share) => (
+        <Space>
+          <Button
+            type="link"
+            size="small"
+            icon={<EditOutlined />}
+            onClick={() => {
+              setEditingShare(record);
+              shareEditForm.setFieldsValue({
+                password: record.hasPassword ? "" : undefined,
+                expiresIn: record.expiresAt ? undefined : 0,
+              });
+              setIsShareEditVisible(true);
+            }}
+          >
+            编辑
+          </Button>
+          <Popconfirm
+            title="禁用分享"
+            description="是否要禁用此分享链接？"
+            onConfirm={() => handleDeactivateShare(record.id)}
+            okText="确认"
+            cancelText="取消"
+          >
+            <Button type="link" danger size="small" icon={<StopOutlined />}>
+              禁用
+            </Button>
+          </Popconfirm>
+          <Popconfirm
+            title="删除分享"
+            description="删除后无法恢复，是否继续？"
+            onConfirm={() => handleDeleteShare(record.id)}
+            okText="删除"
+            cancelText="取消"
+          >
+            <Button type="link" danger size="small" icon={<DeleteOutlined />}>
+              删除
+            </Button>
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ];
+
   const items: TabsProps["items"] = [
     {
       key: "1",
@@ -358,6 +558,27 @@ const AppDetail: React.FC = () => {
     },
     {
       key: "2",
+      label: "分享管理",
+      children: (
+        <>
+          <div style={{ marginBottom: 16 }}>
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={() => {
+                shareForm.resetFields();
+                setIsShareModalVisible(true);
+              }}
+            >
+              生成分享链接
+            </Button>
+          </div>
+          <Table columns={shareColumns} dataSource={shares} rowKey="id" />
+        </>
+      ),
+    },
+    {
+      key: "3",
       label: "模板管理",
       children: (
         <>
@@ -422,34 +643,6 @@ const AppDetail: React.FC = () => {
                 >
                   编辑应用
                 </Button>
-                <Button
-                  type="primary"
-                  icon={<ShareAltOutlined />}
-                  onClick={async () => {
-                    try {
-                      const response = await axios.post(`/apps/${id}/share`);
-                      const shareUrl = `${window.location.origin}/share/${response.data.shareToken}`;
-                      Modal.success({
-                        title: "分享链接已生成",
-                        content: (
-                          <div>
-                            <p>分享链接有效期为30天，请复制下方链接分享：</p>
-                            <Input.TextArea
-                              value={shareUrl}
-                              autoSize
-                              readOnly
-                              onClick={(e) => e.currentTarget.select()}
-                            />
-                          </div>
-                        ),
-                      });
-                    } catch (error) {
-                      showMessage.error("生成分享链接失败");
-                    }
-                  }}
-                >
-                  分享应用
-                </Button>
               </Space>
             </div>
           </div>
@@ -459,6 +652,29 @@ const AppDetail: React.FC = () => {
         <Tabs items={items} />
       </div>
 
+      <Modal
+        title={editingShare ? `编辑分享 #${editingShare.id}` : "编辑分享"}
+        open={isShareEditVisible}
+        onOk={shareEditForm.submit}
+        onCancel={() => {
+          setIsShareEditVisible(false);
+          setEditingShare(null);
+        }}
+        destroyOnHidden
+      >
+        <Form form={shareEditForm} onFinish={handleUpdateShare} layout="vertical">
+          <Form.Item name="password" label="访问密码（留空清除密码）" rules={[{ min: 0 }]}>
+            <Input.Password placeholder="输入新密码，留空清除密码；不修改请不填" />
+          </Form.Item>
+          <Form.Item
+            name="expiresIn"
+            label="有效期（天）"
+            rules={[{ type: "number", min: 0, message: "有效期不能为负数" }]}
+          >
+            <InputNumber placeholder="0 表示永久有效" min={0} max={365} style={{ width: "100%" }} />
+          </Form.Item>
+        </Form>
+      </Modal>
       <Modal
         title="发布版本"
         open={isVersionModalVisible}
@@ -639,6 +855,42 @@ const AppDetail: React.FC = () => {
           </Button>
           <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordWrap: "break-word" }}>{previewContent}</pre>
         </div>
+      </Modal>
+
+      <Modal
+        title="生成分享链接"
+        open={isShareModalVisible}
+        onOk={shareForm.submit}
+        onCancel={() => setIsShareModalVisible(false)}
+        destroyOnHidden
+      >
+        <Form form={shareForm} onFinish={handleCreateShare} layout="vertical">
+          <Form.Item
+            name="password"
+            label="访问密码"
+            rules={[
+              {
+                min: 4,
+                message: "密码长度不少于4位",
+              },
+            ]}
+          >
+            <Input.Password placeholder="不输入则不设置密码" />
+          </Form.Item>
+          <Form.Item
+            name="expiresIn"
+            label="有效期"
+            rules={[
+              {
+                type: "number",
+                min: 0,
+                message: "有效期不能为负数",
+              },
+            ]}
+          >
+            <InputNumber placeholder="天数，0表示永久有效" min={0} max={365} style={{ width: "100%" }} />
+          </Form.Item>
+        </Form>
       </Modal>
 
       <Modal

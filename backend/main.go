@@ -34,8 +34,8 @@ func main() {
 		apiGroup.GET("/open/latest", v1.GetLatestVersion)
 		apiGroup.GET("/open/changelog", v1.GetChangelog)
 		apiGroup.GET("/open/download/:token", v1.SecureDownload)
-		apiGroup.GET("/share/:token", v1.GetSharedApp)
-		apiGroup.GET("/share/:token/versions", v1.GetSharedAppVersions)
+		apiGroup.POST("/share/:token", v1.GetSharedApp)
+		apiGroup.POST("/share/:token/versions", v1.GetSharedAppVersions)
 
 		// 认证API
 		apiGroup.POST("/auth/login", v1.Login)
@@ -49,6 +49,10 @@ func main() {
 			auth.GET("/apps/:id", v1.GetApp)
 			auth.GET("/apps", v1.ListApps)
 			auth.POST("/apps/:id/share", v1.GenerateShareLink)
+			auth.GET("/apps/:id/shares", v1.ListShares)
+			auth.PUT("/apps/:id/shares/:shareId", v1.UpdateShare)
+			auth.PUT("/apps/:id/shares/:shareId/deactivate", v1.DeactivateShare)
+			auth.DELETE("/apps/:id/shares/:shareId", v1.DeleteShare)
 
 			// 版本管理
 			auth.POST("/versions", v1.CreateVersion)

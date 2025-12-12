@@ -45,3 +45,12 @@ export interface File {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface Share {
+  id: number;
+  token: string;
+  hasPassword: boolean;
+  expiresAt?: string;
+  isActive: boolean;
+  createdAt: string;
+}

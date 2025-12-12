@@ -31,7 +31,7 @@ func init() {
 	// 默认配置
 	GlobalConfig = Config{
 		Server: ServerConfig{
-			Port: 8080,
+			Port: 9080,
 		},
 		Database: DatabaseConfig{
 			Type: "sqlite",

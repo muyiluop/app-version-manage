@@ -2,7 +2,7 @@ import axios from "axios";
 import { showMessage } from "./message";
 
 // 设置基础URL
-axios.defaults.baseURL = import.meta.env.VITE_API_BASE_URL;
+axios.defaults.baseURL = import.meta.env.VITE_API_BASE_URL || "/api";
 
 // 添加请求拦截器
 axios.interceptors.request.use(
