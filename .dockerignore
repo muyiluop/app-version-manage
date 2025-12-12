@@ -16,6 +16,9 @@ backend/.vscode
 
 # 部署目录
 deploy/
+!deploy/Dockerfile
+!deploy/nginx.conf
+!deploy/entrypoint.sh
 
 # IDE 配置
 .vscode/
