@@ -1,0 +1,6 @@
+server:
+  port: 8080
+# database:
+#   path: /app/data/app_version.db
+# storage:
+#   path: /app/static/uploads

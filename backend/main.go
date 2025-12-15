@@ -5,6 +5,7 @@ import (
 	"app_version_manage/config"
 	"app_version_manage/middleware"
 	"app_version_manage/repository"
+	"flag"
 	"fmt"
 	"log"
 
@@ -17,6 +18,26 @@ import (
 // @host localhost:8080
 // @BasePath /api
 func main() {
+	configPath := flag.String("config", "config.yaml", "配置文件路径 (可选)")
+	port := flag.Int("port", -1, "HTTP 服务端口，默认从配置文件读取")
+	dbPath := flag.String("db", "", "数据库路径，覆盖配置文件")
+	storagePath := flag.String("storage", "", "文件存储路径，覆盖配置文件")
+	jwtSecret := flag.String("jwt-secret", "", "JWT 密钥，覆盖配置文件")
+	jwtExpire := flag.Int("jwt-expire", -1, "JWT 过期时间（小时），覆盖配置文件")
+	flag.Parse()
+
+	overrides := config.Override{
+		Port:      *port,
+		DBPath:    *dbPath,
+		Storage:   *storagePath,
+		JWTSecret: *jwtSecret,
+		JWTExpire: *jwtExpire,
+	}
+
+	if err := config.Load(*configPath, overrides); err != nil {
+		log.Fatalf("加载配置失败: %v", err)
+	}
+
 	// 初始化数据库
 	if err := repository.InitDB(); err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)

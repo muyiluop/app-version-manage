@@ -19,6 +19,7 @@ deploy/*
 !deploy/nginx.conf
 !deploy/Dockerfile
 !deploy/entrypoint.sh
+!deploy/config.yaml
 
 # IDE 配置
 .vscode/*

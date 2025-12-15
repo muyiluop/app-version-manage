@@ -31,28 +31,35 @@ ARG VERSION
 LABEL version=${VERSION}
 
 # 时区设置
-RUN apk add --no-cache tzdata ca-certificates && \
+RUN apk add --no-cache tzdata ca-certificates tar gzip && \
     cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
     echo "Asia/Shanghai" > /etc/timezone
 
-# 创建应用目录和上传目录
-RUN mkdir -p /app/static/uploads
+# 创建临时目录用于打包
+RUN mkdir -p /tmp/appv_init
 
-# 复制前端构建产物到 nginx 根目录
-COPY --from=frontend-builder /build/frontend/dist /usr/share/nginx/html/
+# 复制前端构建产物
+COPY --from=frontend-builder /build/frontend/dist /tmp/appv_init/www/
 
 # 复制后端二进制
-COPY --from=backend-builder /build/backend/app /app/app
+COPY --from=backend-builder /build/backend/app /tmp/appv_init/app
+RUN chmod +x /tmp/appv_init/app
+
+# 复制配置文件
+COPY deploy/config.yaml /tmp/appv_init/config.yaml
+
+# 打包成 tar.gz
+RUN mkdir -p /etc/appv && \
+    cd /tmp/appv_init && \
+    tar czf /etc/appv/init.tar.gz . && \
+    rm -rf /tmp/appv_init
 
 # 复制 nginx 配置
 COPY deploy/nginx.conf /etc/nginx/conf.d/default.conf
 
 # 复制启动脚本
 COPY deploy/entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh /app/app
-
-# 环境变量
 ENV GIN_MODE=release
 EXPOSE 80
-
-CMD ["/docker-entrypoint.sh"]
+WORKDIR /app
+ENTRYPOINT ["sh", "/docker-entrypoint.sh"]

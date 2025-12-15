@@ -15,10 +15,8 @@ backend/static/uploads/*
 backend/.vscode
 
 # 部署目录
-deploy/
-!deploy/Dockerfile
-!deploy/nginx.conf
-!deploy/entrypoint.sh
+deploy/www/
+deploy/app
 
 # IDE 配置
 .vscode/

@@ -1,0 +1,4 @@
+server:
+  port: 9080
+database:
+  path: /app/data/app_version.db
