@@ -98,6 +98,8 @@ const AppShare: React.FC = () => {
         setApp(response.data.app);
         setVersions(response.data.versions);
         setCurrentPlatform(response.data.currentPlatform);
+        // 更新页面标题为应用名称
+        document.title = response.data.app.name;
       } catch (error: any) {
         if (error.response?.status === 209) {
           // 需要密码验证
@@ -108,6 +110,8 @@ const AppShare: React.FC = () => {
           // 链接无效或过期等错误，清除已记录的密码
           const key = `share_password_${token}`;
           sessionStorage.removeItem(key);
+          // 错误时恢复默认标题
+          document.title = "应用分享";
         }
       } finally {
         setLoading(false);

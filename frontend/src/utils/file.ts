@@ -1,4 +1,5 @@
 import axios from "axios";
+import { saveAs } from "file-saver";
 
 /**
  * 将文件路径转换为可访问的URL
@@ -32,14 +33,8 @@ export async function downloadFile(path: string, fileName?: string, isTempLink: 
       responseType: "blob",
     });
 
-    const url = window.URL.createObjectURL(new Blob([response.data]));
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = fileName || path;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
+    // 使用 file-saver 的 saveAs 方法，提高移动平台兼容性
+    saveAs(response.data, fileName || path);
   } catch (error) {
     console.error("下载文件失败:", error);
     throw error;

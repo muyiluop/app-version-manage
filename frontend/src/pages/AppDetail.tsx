@@ -720,7 +720,7 @@ const AppDetail: React.FC = () => {
                 validateTrigger: ["onBlur"],
                 validator: (_, value) => {
                   console.log("value:", value);
-                  if (value == "") {
+                  if (value == "" || value == null) {
                     return Promise.resolve();
                   }
                   if (isJson(value)) {
