@@ -31,7 +31,7 @@ ARG VERSION
 LABEL version=${VERSION}
 
 # 时区设置
-RUN apk add --no-cache tzdata ca-certificates tar gzip && \
+RUN apk add --no-cache tzdata ca-certificates tar gzip shared-mime-info && \
     cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
     echo "Asia/Shanghai" > /etc/timezone
 
