@@ -176,6 +176,7 @@ func SecureDownload(c *gin.Context) {
 	}
 
 	// 设置下载响应头
+	c.Header("Content-Type", fileInfo.Type)
 	c.Header("Content-Description", "File Transfer")
 	c.Header("Content-Transfer-Encoding", "binary")
 	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", fileInfo.Name))
