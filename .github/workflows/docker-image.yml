@@ -40,11 +40,11 @@ jobs:
               echo "tag=latest" >> $GITHUB_OUTPUT
             fi
           fi
-
-      - name: Log in to GitHub Container Registry
+      - name: Log in to Gitea Container Registry
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
+          # 使用你 Gitea 的实际域名
+          registry: git.dev.smartmeter.vip:8880
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
@@ -55,11 +55,9 @@ jobs:
           file: deploy/Dockerfile
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/app-version-manage:${{ steps.vars.outputs.tag }}
-            ghcr.io/${{ github.repository_owner }}/app-version-manage:latest
-          build-args: |
-            VERSION=${{ steps.vars.outputs.tag }}
+            git.dev.smartmeter.vip:8880/${{ github.repository }}:${{ steps.vars.outputs.tag }}
+            git.dev.smartmeter.vip:8880/${{ github.repository }}:latest
 
       - name: Output image
         run: |
-          echo "Image pushed: ghcr.io/${{ github.repository_owner }}/app-version-manage:${{ steps.vars.outputs.tag }}"
+          echo "Image pushed: git.dev.smartmeter.vip:8880/${{ github.repository }}:${{ steps.vars.outputs.tag }}"
