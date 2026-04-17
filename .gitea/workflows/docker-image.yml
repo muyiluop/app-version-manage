@@ -40,7 +40,7 @@ jobs:
           # 使用你 Gitea 的实际域名
           registry: git.dev.smartmeter.vip:8880
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and push image
         run: |
