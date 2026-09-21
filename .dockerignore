@@ -17,6 +17,16 @@ backend/.vscode
 # 部署目录
 deploy/www/
 deploy/app
+deploy/appv
+
+# 文档、脚本与备份
+docs/
+scripts/
+backups/
+
+# 环境文件（避免把密钥打进镜像）
+.env
+.env.*
 
 # IDE 配置
 .vscode/
