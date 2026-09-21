@@ -52,6 +52,10 @@ type ServerConfig struct {
 	Port    int    `yaml:"port"`
 	Mode    string `yaml:"mode"`
 	BaseURL string `yaml:"baseUrl"`
+	// TrustedProxies 列出可信反向代理地址。只有来自这些地址的
+	// X-Forwarded-For 才会被用于识别客户端 IP，避免限流被伪造头绕过。
+	// 置空表示不信任任何代理（ClientIP 直接取 RemoteAddr）。
+	TrustedProxies []string `yaml:"trustedProxies"`
 }
 
 // IsRelease 是否生产模式。
@@ -135,7 +139,12 @@ type CORSConfig struct {
 // Default 返回内置默认配置。
 func Default() *Config {
 	return &Config{
-		Server: ServerConfig{Port: 9080, Mode: ModeDebug},
+		Server: ServerConfig{
+			Port: 9080,
+			Mode: ModeDebug,
+			// 默认部署是同机 nginx 反向代理
+			TrustedProxies: []string{"127.0.0.1", "::1"},
+		},
 		Database: DatabaseConfig{
 			Driver:       DriverSQLite,
 			Path:         "./data/app_version.db",
@@ -200,6 +209,9 @@ func merge(base, file *Config) {
 	}
 	if file.Server.BaseURL != "" {
 		base.Server.BaseURL = file.Server.BaseURL
+	}
+	if len(file.Server.TrustedProxies) > 0 {
+		base.Server.TrustedProxies = file.Server.TrustedProxies
 	}
 
 	if file.Database.Driver != "" {
@@ -309,6 +321,18 @@ func applyEnv(cfg *Config) {
 	cfg.Server.Port = envInt(cfg.Server.Port, "SERVER_PORT")
 	cfg.Server.Mode = envString(cfg.Server.Mode, "SERVER_MODE")
 	cfg.Server.BaseURL = envString(cfg.Server.BaseURL, "SERVER_BASE_URL")
+
+	// none/空 表示不信任任何代理；* 表示信任全部（仅限外层已有可信网关时使用）
+	if v, ok := os.LookupEnv(EnvPrefix + "SERVER_TRUSTED_PROXIES"); ok {
+		switch strings.TrimSpace(v) {
+		case "", "none":
+			cfg.Server.TrustedProxies = nil
+		case "*":
+			cfg.Server.TrustedProxies = []string{"0.0.0.0/0", "::/0"}
+		default:
+			cfg.Server.TrustedProxies = splitCSV(v)
+		}
+	}
 
 	cfg.Database.Driver = envString(cfg.Database.Driver, "DATABASE_DRIVER")
 	cfg.Database.Path = envString(cfg.Database.Path, "DATABASE_PATH")

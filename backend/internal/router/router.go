@@ -24,6 +24,13 @@ func New(cfg *config.Config, svc *service.Services, log *slog.Logger) *gin.Engin
 	}
 
 	r := gin.New()
+
+	// 只信任显式配置的反向代理，防止伪造 X-Forwarded-For 绕过 IP 限流。
+	if err := r.SetTrustedProxies(cfg.Server.TrustedProxies); err != nil {
+		log.Warn("设置可信代理失败，将不信任任何代理", "error", err)
+		_ = r.SetTrustedProxies(nil)
+	}
+
 	r.Use(
 		middleware.RequestID(),
 		middleware.AccessLog(log),
