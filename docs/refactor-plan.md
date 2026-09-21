@@ -160,7 +160,7 @@
 - 版本编辑 / 重新上架 / 回滚；删除改软删 + 引用计数，异步 GC 清理孤儿文件。
 - 文件：sha256 去重、分片目录（`xx/yy/hash`）、类型/体积白名单、配额统计。
 - **新增更新检查接口**：
-  `GET /api/v2/apps/{identifier}/check?platform=&channel=&currentVersion=`
+  `GET /api/v2/check?identifier=&platform=&channel=&currentVersion=`（Gin 同一路径段不能同时用 `:id` 与 `:identifier`，故独立成 `/api/v2/check`）
   → `{ hasUpdate, latest, forceUpdate, minSupportedVersion, releaseNotes, artifacts:[{url, sha256, size}] }`
 - **验收**：最新版本判定、semver 比较、回滚、GC 均有单测；用现有数据跑通。
 
@@ -293,4 +293,26 @@
 
 - `/api/open/latest`、`/api/open/changelog`、`/api/open/download/:token`、`/api/share/*` 的**响应结构、字段名、`209` 语义全部保持不变**。
 - 新增可选 `channel` 查询参数；不传时与现行为完全一致。
-- v2 新增语义化检测更新：`GET /api/v2/apps/{identifier}/check?platform=&channel=&currentVersion=`。
+- v2 新增语义化检测更新：`GET /api/v2/check?identifier=&platform=&channel=&currentVersion=`（Gin 同一路径段不能同时用 `:id` 与 `:identifier`，故独立成 `/api/v2/check`）。
+
+---
+
+## 十二、实施状态（分支 refactor/v2）
+
+| Phase | 状态 | 说明 |
+| --- | --- | --- |
+| P0 基线 | ✅ 完成 | 分支建立、垃圾文件与死代码清理、`.env.example` |
+| P1 后端分层 | ✅ 完成 | `cmd/server` + `internal/*`；统一错误码；slog + requestId；配置 env 覆盖；版本化迁移 |
+| P2 安全加固 | ✅ 完成 | bcrypt、密钥分离、HMAC 下载令牌、路径穿越防护、限流、令牌吊销、审计、三角色 |
+| P3 领域模型 | ✅ 完成 | channel、semver、状态机、sha256 秒传、local/S3 存储抽象、检测更新接口 |
+| P4 契约 | 🟡 部分 | `docs/api-v2.md` 完整契约；**OpenAPI 自动生成未做**（swag 注解量大，列为后续） |
+| P5 前端 | 🚧 进行中 | API 层与类型已完成，feature 拆分与页面进行中 |
+| P6 运维 | ✅ 完成 | Dockerfile/compose/nginx/健康检查/在线备份/CI |
+| P7 收尾 | ⏳ 待前端完成 | 待验收前端后统一提交并发布 v2.0.0 |
+
+### 已知偏离与取舍
+
+1. **下载令牌不兼容旧令牌**：旧实现用硬编码 AES 密钥签发令牌；新实现改为独立 HMAC 密钥。升级前已签发的令牌在 24h 内失效，重新调用 `/api/open/latest` 即得新令牌。
+2. **历史分享密码**：旧数据使用可逆 AES 加密，出于安全考虑不再解密，需管理员在后台重新设置访问密码（迁移已标记 `password_algo=legacy-aes`）。
+3. **孤儿文件清理口径**：为避免误删仍可恢复的数据，被**软删除版本**引用的文件不会被清理。
+4. **PostgreSQL / MySQL 未做运行时验证**：本机无 Docker，仅保证代码与迁移 SQL 使用三方言通用写法；建议在 CI 或预发环境跑一次集成验证。
