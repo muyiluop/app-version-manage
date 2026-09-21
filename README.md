@@ -1,154 +1,162 @@
-## 应用版本管理系统 (App Version Manage)
+# 软件版本发布系统 (App Version Manage) · v2
 
-这是一个用于管理应用版本发布、文件存储与共享的开源后台服务与简单前端界面。
+面向内部软件分发的版本发布与更新管理平台：管理应用、按平台/通道发布版本、生成受控下载链接、
+提供检测更新接口，并支持文件托管、分享门户与自定义输出模板。
 
-核心功能
+- 后端：Go 1.26 + Gin + GORM，支持 **SQLite（默认）/ PostgreSQL / MySQL**
+- 前端：React 19 + Vite 6 + TypeScript + Ant Design 5
+- 存储：**本地磁盘（默认）/ S3 兼容对象存储（MinIO、AWS S3）**
+- 交付：单个 Docker 镜像（nginx + 后端二进制），或 `docker compose` 组合部署
+- 安全：bcrypt 口令、密钥分离、HMAC 签名下载、登录/分享限流、审计日志、角色权限
 
-- 管理应用与多个平台（android/ios/windows/macos/linux/harmony）的版本信息
-- 生成受控下载链接（带过期 token）
-- 支持模板化输出（JSON/XML/HTML/YAML 等）用于自定义对接
-- 文件上传、列举、与清理未使用文件
-- 生成分享链接并获取分享的应用及版本列表
+> 本分支为 v2 重构版本。协议细节见 [docs/api-v2.md](docs/api-v2.md)，重构方案与决策见 [docs/refactor-plan.md](docs/refactor-plan.md)。
 
-项目结构（重要目录）
+## 功能概览
 
-- `backend/` - Go 后端服务源码
-  - `main.go` - 后端入口，路由与服务器启动逻辑位于此
-  - `api/v1/` - REST 接口实现（包括开放接口、认证接口、文件/版本管理等）
-  - `config/` - 配置加载与全局配置结构（`config.GlobalConfig`）
-  - `repository/` - 数据库初始化与 ORM（GORM）相关代码
-  - `utils/` - 工具函数（例如生成安全 token、文件处理等）
-- `frontend/` - React + Vite 前端源码
-  - `package.json` - 启动 / 构建脚本
-  - `src/` - 页面与组件
-- `deploy/` - 容器化部署相关文件
-  - `Dockerfile` - 最终镜像构建（基于 nginx，拷贝 `www` 静态和后端可执行文件）
-  - `entrypoint.sh` - 镜像启动脚本
+- **应用管理**：应用标识、图标、描述、支持平台、默认通道
+- **通道**：每个应用自动具备 `stable` / `beta`，可自定义（如 `hotfix`），更新检查按通道进行
+- **版本管理**：语义化版本排序、状态机（草稿/已发布/已下架）、强制更新、最低支持版本、扩展信息（JSON）、发布/下架/回滚
+- **文件托管**：SHA-256 秒传与去重、分片目录、孤儿文件清理、上传类型/大小限制
+- **受控下载**：HMAC 签名短时效链接；本地存储走服务端流式代理，S3 走预签名直连
+- **分享门户**：可设访问密码与有效期，移动端自适应
+- **输出模板**：用 Go template 自定义开放接口返回（JSON/XML/HTML/YAML 等）
+- **检测更新**：客户端上报当前版本，服务端返回是否更新、是否强制、最低支持版本与校验值
+- **多用户与审计**：admin / releaser / viewer 三种角色，关键操作全部留痕
 
-快速开始（开发）
+## 目录结构
 
-先决条件
+```
+backend/
+  cmd/server/            服务入口（含 -migrate-only / -backup）
+  internal/
+    config/              配置加载（YAML + APPV_ 环境变量）与校验
+    database/            多数据库连接、版本化迁移、初始化、在线备份
+    model/               领域实体
+    repository/          数据访问
+    service/             业务逻辑
+    storage/             存储抽象：local / s3
+    middleware/          请求 ID、恢复、访问日志、CORS、JWT、角色、限流
+    api/v2/              v2 后台接口
+    api/v1compat/        v1 兼容接口（开放/分享/登录）
+    api/common/          下载与平台识别等公共逻辑
+    router/              路由装配与健康检查
+    pkg/                 semver、token 等基础库
+  config.yaml            本地开发配置
+frontend/                React 前端
+deploy/                  Dockerfile / nginx.conf / entrypoint.sh / 容器配置
+scripts/                 备份与恢复
+docs/                    方案与接口文档
+```
 
-- Go (>= 1.20 推荐)
-- Node.js + npm
-- Docker（用于容器化部署，可选）
+## 快速开始
 
-启动后端（本地开发）
+### 后端（开发）
 
-```powershell
-# 在仓库根或进入 backend 目录
+```bash
 cd backend
-# 使用 go run 直接运行（读取配置文件以获取端口）
-go run main.go
+go run ./cmd/server -config config.yaml
+# 默认监听 http://localhost:9080
 ```
 
-说明：后端使用 `config.GlobalConfig.Server.Port` 指定监听端口。默认在 `main.go` 的注释示例中使用 8080（请查看 `config/config.go` 以确认或覆盖）。后端会将静态文件目录挂载到 `/static`（映射到配置中的 storage.path）。
+首次启动会自动建表、迁移历史数据并创建管理员账号：
 
-启动前端（本地开发）
+- 若设置了 `APPV_ADMIN_INITIAL_PASSWORD`，使用该口令；
+- 否则随机生成并在启动日志中以 WARN 打印一次，登录后请立即修改。
 
-```powershell
+开发模式下未配置的密钥会临时随机生成（每次重启失效）；**生产模式缺失密钥会直接拒绝启动**。
+
+### 前端（开发）
+
+```bash
 cd frontend
 npm install
-npm run dev
+npm run dev      # Vite 开发服务器，/api 代理到 localhost:9080
 ```
 
-构建前端
+### Docker
 
-```powershell
-cd frontend
-npm install
-npm run build
+```bash
+cp .env.example .env      # 填写 APPV_JWT_SECRET / APPV_DOWNLOAD_TOKEN_KEY 等
+docker compose up -d --build
+# 访问 http://localhost:8081
 ```
 
-生产镜像（Docker）
-项目包含 `deploy/Dockerfile`，该 Dockerfile 最终生成一个基于 nginx 的镜像：
+可选组件：
 
-- 将前端构建目录（`www`）复制到 nginx 静态目录
-- 将后端可执行文件 `app` 复制到镜像内部 `/app` 并通过 `entrypoint.sh` 启动
-
-示例：构建并运行镜像
-
-```powershell
-# 在仓库根（假设你已在本地完成前端构建并把产物放到根的 www/ 目录，且后端可执行文件生成放在 deploy 构建上下文的 app 文件）
-docker build -f deploy/Dockerfile -t app-version-manage:latest .
-docker run -p 80:80 --name app-version-manage app-version-manage:latest
+```bash
+docker compose --profile postgres up -d --build   # 使用 PostgreSQL
+docker compose --profile s3 up -d --build         # 使用 MinIO
 ```
 
-镜像暴露端口：80（nginx）。后端 API 的基础路径为 `/api`（例如：`/api/open/latest`）。
+## 配置
 
-配置说明
+优先级：**代码默认值 < YAML 文件 < `APPV_` 环境变量**。完整清单见 [.env.example](.env.example)。
 
-- `config/` 目录包含配置结构与加载逻辑（例如 `Server.Port`、`Storage.Path`、数据库配置等）。
-- 请在生产部署时通过环境变量或配置文件设置数据库连接、存储路径与密钥等敏感信息。
+常用项：
 
-存储与文件系统
+| 变量 | 说明 | 默认 |
+| --- | --- | --- |
+| `APPV_SERVER_PORT` | 监听端口 | 9080 |
+| `APPV_SERVER_MODE` | `debug` / `release` | debug |
+| `APPV_DATABASE_DRIVER` | `sqlite` / `postgres` / `mysql` | sqlite |
+| `APPV_DATABASE_PATH` | SQLite 文件路径 | ./data/app_version.db |
+| `APPV_DATABASE_DSN` | PG/MySQL 连接串 | — |
+| `APPV_STORAGE_DRIVER` | `local` / `s3` | local |
+| `APPV_STORAGE_LOCAL_ROOT` | 本地存储根目录 | ./static/uploads |
+| `APPV_STORAGE_S3_*` | S3/MinIO 连接参数 | — |
+| `APPV_JWT_SECRET` | JWT 密钥（生产必填，≥16 位） | 开发模式随机 |
+| `APPV_DOWNLOAD_TOKEN_KEY` | 下载签名密钥（生产必填，≥16 位） | 开发模式随机 |
+| `APPV_SHARE_PASSWORD_PEPPER` | 分享密码 pepper | — |
+| `APPV_ADMIN_INITIAL_PASSWORD` | 首次启动的管理员口令 | 随机 |
+| `APPV_UPLOAD_MAX_SIZE_MB` | 单文件上限 | 4096 |
 
-- 后端在 `main.go` 中把静态目录 `config.GlobalConfig.Storage.Path` 挂载为 `/static`，并在容器镜像中创建 `/app/static/uploads` 目录用于保存上传文件。
-- 文件上传、下载与清理接口实现位于 `api/v1` 的文件处理相关代码（`file.go`）。
+## 数据迁移与兼容
 
-主要 API 概览（来自 `backend/main.go` 与 `api/v1`）
+- 迁移**只增不改**：只新增表、列与索引，绝不重建或删除已有数据，可安全回滚到旧镜像。
+- 历史数据自动升级：明文口令 → bcrypt；`is_active` → `status`；版本号 → 语义化数值列；
+  每个应用补齐默认通道；无管理员的库会把最早的用户提升为 admin。
+- 同一 `(app, platform, version)` 的重复记录会保留最新一条并在日志中列出被删除的 ID（**物理文件不删除**）。
+- 迁移前建议先备份：`scripts/backup.ps1`（SQLite 使用 `VACUUM INTO` 在线快照）。
 
-- 开放接口（无需认证）
+## 接口速览
 
-  - GET /api/open/latest?identifier=...&platform=... - 获取某应用在特定平台的最新版本信息（支持 format 模板输出）
-  - GET /api/open/changelog?identifier=...&platform=... - 获取版本变更历史
-  - GET /api/open/download/:token - 根据安全 token 下载文件（token 会在后端生成并含有效期）
-  - GET /api/share/:token - 获取分享的应用信息
-  - GET /api/share/:token/versions - 获取分享应用的版本列表
+- 后台：`/api/v2/**`（统一 `{code,message,data,requestId}` 信封）
+- 开放：`/api/open/latest`、`/api/open/changelog`、`/api/open/check`、`/api/open/download/:token`
+- 分享：`POST /api/share/:token`、`POST /api/share/:token/versions`
+- 健康：`/healthz`、`/readyz`
 
-- 认证接口
+v1 开放与分享接口的结构、字段名与「需要密码返回 209」的行为**保持不变**，可直接被现有客户端继续使用。
+完整契约见 [docs/api-v2.md](docs/api-v2.md)。
 
-  - POST /api/auth/login - 登录，返回鉴权信息（用于后续需要认证的接口）
+## 开发与验证
 
-- 需要鉴权的接口（通过中间件 `middleware.AuthMiddleware()`）
-  - 应用管理：POST /api/apps, PUT /api/apps/:id, GET /api/apps/:id, GET /api/apps
-  - 版本管理：POST /api/versions, PUT /api/versions/:id/deactivate, DELETE /api/versions/:id, GET /api/versions
-  - 模板管理：POST /api/templates, PUT /api/templates/:id, DELETE /api/templates/:id, GET /api/templates
-  - 文件管理：POST /api/files/upload, GET /api/files, POST /api/files/clean, GET /api/files/download/\*path
-
-模板与自定义输出
-
-- 后端支持用数据库中保存的模板（`model.Template`）渲染输出。当 `GET /api/open/latest?format=xxx` 指定模板名时，后端会查找对应模板并用 `text/template` 渲染，模板可产生 JSON、XML、HTML 或 YAML（由模板名后缀决定 Content-Type）。
-
-安全与令牌
-
-- 文件下载使用短期有效的安全 token（见 `utils.GenerateSecureToken`），默认示例中 token 有 24 小时有效期（在 `api/v1/open.go` 中可见示例）。
-
-开发建议与调试
-
-- 本地开发时可分别运行前后端：前端使用 Vite 的 `dev`，后端使用 `go run`。
-- 若前端需要调用本地后端 API，请在前端请求中使用 `http://localhost:<后端端口>/api`，或通过 Vite 的代理配置将 API 转发到后端。
-
-常见命令汇总（PowerShell）
-
-```powershell
+```bash
 # 后端
 cd backend
-go run main.go
+go vet ./...
+go test ./...            # 迁移、发布流程、令牌/存储/版本号均有测试
 
-# 前端（开发）
+# 前端
 cd frontend
-npm install
-npm run dev
-
-# 前端（构建）
+npx tsc --noEmit
+npm run lint
 npm run build
-
-# Docker（构建并运行）
-docker build -f deploy/Dockerfile -t app-version-manage:latest .
-docker run -p 80:80 app-version-manage:latest
 ```
 
-示例：获取最新版本（开放接口）
+CI（`.github/workflows/ci.yml`）在每次推送时执行以上检查。
 
-```powershell
-curl "http://localhost:8080/api/open/latest?identifier=com.example.app&platform=android"
+## 运维
+
+```bash
+# 备份（默认本地模式；容器内使用 -Mode docker）
+.\scripts\backup.ps1
+
+# 仅执行迁移（升级前排障）
+/app/appv -config /app/config.yaml -migrate-only
 ```
 
-贡献与联系
+恢复步骤见 [scripts/restore.md](scripts/restore.md)。
 
-- 欢迎提出 issue 或 PR。请在贡献前先运行本地测试与 lint（后端可添加单元测试，前端使用 ESLint）。
+## 许可证
 
-许可证
-
-本项目采用 MIT License 开源协议，详见仓库根目录 LICENSE 文件。
+MIT，详见 [LICENSE](LICENSE)。

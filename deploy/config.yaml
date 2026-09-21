@@ -1,6 +1,21 @@
+# 容器内默认配置；敏感项通过 APPV_* 环境变量覆盖（优先级高于本文件）
 server:
-  port: 8080
-# database:
-#   path: /app/data/app_version.db
-# storage:
-#   path: /app/static/uploads
+  port: 9080
+  mode: release
+
+database:
+  driver: sqlite
+  path: /data/app_version.db
+
+storage:
+  driver: local
+  local:
+    root: /data/uploads
+  signedUrlTtlMinutes: 30
+
+log:
+  level: info
+  format: json
+
+upload:
+  maxSizeMB: 4096

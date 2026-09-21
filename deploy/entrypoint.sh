@@ -1,27 +1,31 @@
 #!/bin/sh
+# 启动脚本：先拉起后端，再用 nginx 作为前台进程。
+# 配置全部来自环境变量（APPV_ 前缀），无需修改镜像内文件。
+set -e
 
-# 检查 /app 是否为空或不存在
-if [ ! -d /app ] || [ -z "$(ls -A /app 2>/dev/null)" ]; then
-    echo "[INFO] /app 目录为空或不存在，正在初始化应用..."
-    mkdir -p /app
-    tar xzf /etc/appv/init.tar.gz -C /app
-    if [ $? -ne 0 ]; then
-        echo "[ERROR] 应用初始化失败"
-        exit 1
-    fi
-    echo "[INFO] 应用初始化完成"
+DB_PATH="${APPV_DATABASE_PATH:-/data/app_version.db}"
+STORAGE_ROOT="${APPV_STORAGE_LOCAL_ROOT:-/data/uploads}"
+
+if [ "${APPV_DATABASE_DRIVER:-sqlite}" = "sqlite" ]; then
+    mkdir -p "$(dirname "$DB_PATH")"
+fi
+if [ "${APPV_STORAGE_DRIVER:-local}" = "local" ]; then
+    mkdir -p "$STORAGE_ROOT"
 fi
 
-# 确保必要的目录存在
-mkdir -p /app/static/uploads /app/logs
+if [ -z "${APPV_JWT_SECRET}" ] || [ -z "${APPV_DOWNLOAD_TOKEN_KEY}" ]; then
+    echo "[ERROR] 缺少 APPV_JWT_SECRET / APPV_DOWNLOAD_TOKEN_KEY，生产模式将拒绝启动" >&2
+    echo "        生成示例: openssl rand -hex 32" >&2
+fi
 
-# 设置权限
-chmod +x /app/app
+echo "[INFO] 启动后端 (driver=${APPV_DATABASE_DRIVER:-sqlite})"
+/app/appv -config /app/config.yaml &
+BACKEND_PID=$!
 
-# 启动后端
-echo "[INFO] 启动应用服务..."
-/app/app -config /app/config.yaml &
+# 后端异常退出时结束容器，交由编排系统重启
+( while kill -0 "$BACKEND_PID" 2>/dev/null; do sleep 5; done
+  echo "[ERROR] 后端进程已退出" >&2
+  kill -TERM 1 2>/dev/null ) &
 
-# 启动 nginx
-echo "[INFO] 启动 nginx..."
+echo "[INFO] 启动 nginx"
 exec nginx -g 'daemon off;'

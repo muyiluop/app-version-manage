@@ -25,6 +25,7 @@ import (
 func main() {
 	configPath := flag.String("config", "config.yaml", "配置文件路径")
 	migrateOnly := flag.Bool("migrate-only", false, "仅执行数据库迁移后退出")
+	backupDir := flag.String("backup", "", "将数据库在线备份到指定目录后退出（仅 sqlite）")
 	flag.Parse()
 
 	cfg, err := config.Load(*configPath)
@@ -57,6 +58,16 @@ func main() {
 
 	if *migrateOnly {
 		log.Info("迁移完成，已按要求退出")
+		return
+	}
+
+	if *backupDir != "" {
+		path, err := database.Backup(db, cfg, *backupDir)
+		if err != nil {
+			log.Error("数据库备份失败", "error", err)
+			os.Exit(1)
+		}
+		log.Info("数据库备份完成", "path", path)
 		return
 	}
 
