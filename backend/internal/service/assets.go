@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"mime"
 	"mime/multipart"
 	"path"
 	"strings"
@@ -197,8 +198,14 @@ func (s *FileService) OpenDownload(ctx context.Context, key string) (*DownloadTa
 			target.ContentType = file.ContentType
 		}
 	}
+	// 历史对象没有 files 记录（也就没有存储的 Content-Type），
+	// 此时按扩展名推断，保证 <img> 等场景能拿到正确的图片类型。
 	if target.ContentType == "" {
-		target.ContentType = "application/octet-stream"
+		if ct := mime.TypeByExtension(path.Ext(cleanKey)); ct != "" {
+			target.ContentType = ct
+		} else {
+			target.ContentType = "application/octet-stream"
+		}
 	}
 
 	ttl := time.Duration(s.cfg.Storage.SignedURLTTLMinutes) * time.Minute

@@ -311,6 +311,12 @@ export interface ShareAccessResult {
   currentPlatform: string;
 }
 
+/** 分享需要密码时的响应（HTTP 209），v1 兼容结构。 */
+export interface SharePasswordRequired {
+  error: string;
+  requirePassword: true;
+}
+
 /** 开放接口 /open/latest 的扁平结构。 */
 export interface OpenLatest {
   appName: string;

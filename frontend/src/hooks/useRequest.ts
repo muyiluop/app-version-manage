@@ -4,7 +4,7 @@
  * 为什么包一层：组件只关心 data/loading/error/refresh，不希望到处写
  * queryKey 与 error 收窄；同时保留契约要求的 useRequest 入口。
  */
-import { useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
+import { useQuery, type QueryKey } from "@tanstack/react-query";
 import { getErrorMessage } from "../api/client";
 
 export interface UseRequestOptions {
@@ -42,13 +42,5 @@ export function useRequest<T>(
     refresh: () => {
       void query.refetch();
     },
-  };
-}
-
-/** 供需要跨组件失效缓存的场景使用。 */
-export function useInvalidate(): (key: QueryKey) => void {
-  const queryClient = useQueryClient();
-  return (key: QueryKey) => {
-    void queryClient.invalidateQueries({ queryKey: key });
   };
 }

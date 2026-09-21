@@ -9,7 +9,9 @@
 - 交付：单个 Docker 镜像（nginx + 后端二进制），或 `docker compose` 组合部署
 - 安全：bcrypt 口令、密钥分离、HMAC 签名下载、登录/分享限流、审计日志、角色权限
 
-> 本分支为 v2 重构版本。协议细节见 [docs/api-v2.md](docs/api-v2.md)，重构方案与决策见 [docs/refactor-plan.md](docs/refactor-plan.md)。
+> 本分支为 v2 重构版本。协议细节见 [docs/api-v2.md](docs/api-v2.md)，重构方案、实施状态与已知取舍见 [docs/refactor-plan.md](docs/refactor-plan.md)。
+>
+> 运行时验证情况：SQLite 与 **PostgreSQL 18** 已端到端实测通过（含迁移、发布、检测更新、签名下载、分享、审计、中文 UTF-8）；**MySQL 尚未做运行时验证**，建议在 CI 或预发环境补测。
 
 ## 功能概览
 
@@ -42,7 +44,13 @@ backend/
     router/              路由装配与健康检查
     pkg/                 semver、token 等基础库
   config.yaml            本地开发配置
-frontend/                React 前端
+frontend/
+  src/api/               按资源划分的接口层（统一信封解包、401/403/429 处理）
+  src/features/          apps / channels / versions / shares / templates / files / users / audit / share-portal
+  src/types/api.ts       与后端契约一致的类型
+  src/hooks/             useRequest（react-query 薄封装）、useSubmit
+  src/components/        Layout、ErrorBoundary
+  src/pages/             路由页面（AppDetail 仅作装配层）
 deploy/                  Dockerfile / nginx.conf / entrypoint.sh / 容器配置
 scripts/                 备份与恢复
 docs/                    方案与接口文档
@@ -138,9 +146,9 @@ go test ./...            # 迁移、发布流程、令牌/存储/版本号均有
 
 # 前端
 cd frontend
-npx tsc --noEmit
+npm run typecheck        # 等价 tsc -b；注意 npx tsc 在 solution 风格 tsconfig 下不检查任何文件
 npm run lint
-npm run build
+npm run build            # tsc -b && vite build
 ```
 
 CI（`.github/workflows/ci.yml`）在每次推送时执行以上检查。

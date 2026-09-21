@@ -4,7 +4,7 @@
  * 菜单选中项由 pathname 派生（不再直接用 pathname 作为 key），
  * 否则 /apps/1 这类子路由不会高亮任何一项。
  */
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { Avatar, Breadcrumb, Dropdown, Layout as AntLayout, Menu, Space, Tag, type MenuProps } from "antd";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
@@ -25,7 +25,7 @@ const { Header, Content, Sider } = AntLayout;
 interface MenuEntry {
   key: string;
   label: string;
-  icon: React.ReactNode;
+  icon: ReactNode;
   /** 仅管理员可见。 */
   adminOnly?: boolean;
 }

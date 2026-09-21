@@ -13,6 +13,7 @@ import type {
   Paginated,
   Platform,
   ShareAccessResult,
+  SharePasswordRequired,
   LegacyVersion,
 } from "../types/api";
 
@@ -24,12 +25,22 @@ export interface ShareAccessQuery {
 }
 
 /** POST /share/:token，需要密码时返回 HTTP 209 + requirePassword。 */
-export function accessShare(token: string, query: ShareAccessQuery): Promise<ShareAccessResult> {
-  return client.post<ShareAccessResult>(
+export function accessShare(
+  token: string,
+  query: ShareAccessQuery
+): Promise<ShareAccessResult | SharePasswordRequired> {
+  return client.post<ShareAccessResult | SharePasswordRequired>(
     `/share/${token}`,
     { password: query.password ?? "" },
     { ...PUBLIC_CONFIG, params: query.channel ? { channel: query.channel } : undefined }
   );
+}
+
+/** 类型守卫：区分"需要密码"与正常的分享数据。 */
+export function isPasswordRequired(
+  result: ShareAccessResult | SharePasswordRequired
+): result is SharePasswordRequired {
+  return (result as SharePasswordRequired).requirePassword === true;
 }
 
 /** POST /share/:token/versions，需要密码的分享同样要带 password。 */

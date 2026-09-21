@@ -4,6 +4,9 @@
  * 为什么只用一个实例：v1 兼容接口与 v2 接口同源（都在 /api 下），
  * 用一个实例可以让鉴权头与错误处理保持一致；区别仅在于成功响应是否带信封，
  * 因此解包逻辑按"是否含 code=OK"判断，而不是按路径判断。
+ *
+ * 为什么不用响应拦截器返回值解包：axios 的类型要求拦截器返回 AxiosResponse，
+ * 强行断言会掩盖类型错误；这里改成在 request() 里显式解包，类型更诚实。
  */
 import axios, { AxiosError, type AxiosRequestConfig } from "axios";
 import type { ApiEnvelope } from "../types/api";
@@ -31,25 +34,18 @@ http.interceptors.request.use((config) => {
   return config;
 });
 
-/** 收窄为 v2 信封。 */
-function isEnvelope(body: unknown): body is ApiEnvelope<unknown> {
-  return typeof body === "object" && body !== null && typeof (body as { code?: unknown }).code === "string";
-}
-
 http.interceptors.response.use(
-  (response) => {
-    const body: unknown = response.data;
-    // 只有 v2 成功信封才取 data；v1 兼容接口与二进制响应原样返回。
-    if (isEnvelope(body) && body.code === "OK") {
-      return body.data;
-    }
-    return body;
-  },
+  (response) => response,
   (error: AxiosError<unknown>) => {
     handleError(error);
     return Promise.reject(error);
   }
 );
+
+/** 收窄为 v2 信封。 */
+function isEnvelope(body: unknown): body is ApiEnvelope<unknown> {
+  return typeof body === "object" && body !== null && typeof (body as { code?: unknown }).code === "string";
+}
 
 /** 从错误响应体里提取后端 message（兼容 v1 的 { error } 结构）。 */
 function extractMessage(body: unknown): string {
@@ -118,9 +114,18 @@ function handleError(error: AxiosError<unknown>): void {
   showMessage.error("网络异常，请检查网络连接");
 }
 
-/**
- * 拦截器已经把响应解包为 data，因此对外暴露的方法直接返回业务数据。
- */
+/** 执行请求并把 v2 信封解包为业务数据。 */
+async function request<T>(config: AxiosRequestConfig): Promise<T> {
+  const response = await http.request<unknown>(config);
+  const body = response.data;
+  if (isEnvelope(body) && body.code === "OK") {
+    return body.data as T;
+  }
+  // v1 兼容接口与二进制响应原样返回
+  return body as T;
+}
+
+/** 对外暴露的请求方法，返回业务数据而非 AxiosResponse。 */
 export interface HttpClient {
   get<T>(url: string, config?: AxiosRequestConfig): Promise<T>;
   delete<T>(url: string, config?: AxiosRequestConfig): Promise<T>;
@@ -129,7 +134,13 @@ export interface HttpClient {
   patch<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T>;
 }
 
-export const client = http as unknown as HttpClient;
+export const client: HttpClient = {
+  get: (url, config) => request({ ...config, url, method: "get" }),
+  delete: (url, config) => request({ ...config, url, method: "delete" }),
+  post: (url, data, config) => request({ ...config, url, method: "post", data }),
+  put: (url, data, config) => request({ ...config, url, method: "put", data }),
+  patch: (url, data, config) => request({ ...config, url, method: "patch", data }),
+};
 
 /** 供 hook 把异常转换为可展示文案。 */
 export function getErrorMessage(error: unknown): string {
