@@ -204,19 +204,19 @@ func (h *Handler) ListVersions(c *gin.Context) {
 }
 
 type publishVersionRequest struct {
-	AppID               uint               `json:"appId" binding:"required"`
-	Platform            model.Platform     `json:"platform" binding:"required"`
-	Channel             string             `json:"channel"`
-	Version             string             `json:"version" binding:"required"`
-	FileKey             string             `json:"fileKey" binding:"required"`
-	FileName            string             `json:"fileName"`
-	FileSize            int64              `json:"fileSize"`
-	FileSHA256          string             `json:"fileSha256"`
-	ContentType         string             `json:"contentType"`
-	Changelog           string             `json:"changelog"`
-	Ext                 string             `json:"ext"`
-	ForceUpdate         bool               `json:"forceUpdate"`
-	MinSupportedVersion string             `json:"minSupportedVersion"`
+	AppID               uint                `json:"appId" binding:"required"`
+	Platform            model.Platform      `json:"platform" binding:"required"`
+	Channel             string              `json:"channel"`
+	Version             string              `json:"version" binding:"required"`
+	FileKey             string              `json:"fileKey" binding:"required"`
+	FileName            string              `json:"fileName"`
+	FileSize            int64               `json:"fileSize"`
+	FileSHA256          string              `json:"fileSha256"`
+	ContentType         string              `json:"contentType"`
+	Changelog           string              `json:"changelog"`
+	Ext                 string              `json:"ext"`
+	ForceUpdate         bool                `json:"forceUpdate"`
+	MinSupportedVersion string              `json:"minSupportedVersion"`
 	Status              model.VersionStatus `json:"status"`
 }
 
@@ -250,19 +250,19 @@ func (h *Handler) PublishVersion(c *gin.Context) {
 }
 
 type updateVersionRequest struct {
-	Platform            *model.Platform     `json:"platform"`
-	Channel             *string             `json:"channel"`
-	Version             *string             `json:"version"`
-	Changelog           *string             `json:"changelog"`
-	Ext                 *string             `json:"ext"`
-	ForceUpdate         *bool               `json:"forceUpdate"`
-	MinSupportedVersion *string             `json:"minSupportedVersion"`
+	Platform            *model.Platform      `json:"platform"`
+	Channel             *string              `json:"channel"`
+	Version             *string              `json:"version"`
+	Changelog           *string              `json:"changelog"`
+	Ext                 *string              `json:"ext"`
+	ForceUpdate         *bool                `json:"forceUpdate"`
+	MinSupportedVersion *string              `json:"minSupportedVersion"`
 	Status              *model.VersionStatus `json:"status"`
-	FileKey             *string             `json:"fileKey"`
-	FileName            *string             `json:"fileName"`
-	FileSize            *int64              `json:"fileSize"`
-	FileSHA256          *string             `json:"fileSha256"`
-	ContentType         *string             `json:"contentType"`
+	FileKey             *string              `json:"fileKey"`
+	FileName            *string              `json:"fileName"`
+	FileSize            *int64               `json:"fileSize"`
+	FileSHA256          *string              `json:"fileSha256"`
+	ContentType         *string              `json:"contentType"`
 }
 
 // UpdateVersion 更新版本。

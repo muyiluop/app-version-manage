@@ -52,9 +52,9 @@ func TestLocalResolveStaysInsideRoot(t *testing.T) {
 func TestNormalizeKeyAcceptsLegacyAndNewKeys(t *testing.T) {
 	cases := map[string]string{
 		"a56ce38779d869ee753e8b6fa9c838f3_logo_min.png": "a56ce38779d869ee753e8b6fa9c838f3_logo_min.png",
-		"ab/cd/abcd1234_setup.exe":                       "ab/cd/abcd1234_setup.exe",
-		"./ab/file.exe":                                  "ab/file.exe",
-		"a//b/file.exe":                                  "a/b/file.exe",
+		"ab/cd/abcd1234_setup.exe":                      "ab/cd/abcd1234_setup.exe",
+		"./ab/file.exe":                                 "ab/file.exe",
+		"a//b/file.exe":                                 "a/b/file.exe",
 	}
 	for input, want := range cases {
 		got, err := NormalizeKey(input)
@@ -69,12 +69,12 @@ func TestNormalizeKeyAcceptsLegacyAndNewKeys(t *testing.T) {
 
 func TestSanitizeFileName(t *testing.T) {
 	cases := map[string]string{
-		"../../etc/passwd":        "passwd",
-		"setup.exe":               "setup.exe",
-		"a<script>.exe":           "a_script_.exe",
-		"  spaced name.bin  ":     "spaced name.bin",
-		"..":                      "file",
-		"":                        "file",
+		"../../etc/passwd":    "passwd",
+		"setup.exe":           "setup.exe",
+		"a<script>.exe":       "a_script_.exe",
+		"  spaced name.bin  ": "spaced name.bin",
+		"..":                  "file",
+		"":                    "file",
 	}
 	for input, want := range cases {
 		if got := SanitizeFileName(input); got != want {

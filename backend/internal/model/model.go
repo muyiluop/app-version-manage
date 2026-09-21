@@ -205,8 +205,22 @@ type Version struct {
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
 
-	// 软删除参与唯一索引：活跃行 deleted_at 为 NULL，从而保证活跃版本唯一。
-	DeletedAt gorm.DeletedAt `json:"-" gorm:"index;uniqueIndex:idx_versions_unique,priority:5"`
+	// DeletedFlag 参与唯一索引：活跃行为 0，软删除行被置为自身的 id。
+	//
+	// 注意：这里不能用 deleted_at 做唯一索引的一部分——SQLite / PostgreSQL / MySQL
+	// 都认为 NULL 互不相等，把可空列放进唯一索引等于放行任意多条活跃重复记录。
+	DeletedFlag uint64 `json:"-" gorm:"not null;default:0;uniqueIndex:idx_versions_unique,priority:5"`
+
+	DeletedAt gorm.DeletedAt `json:"-" gorm:"index"`
+}
+
+// BeforeDelete 软删除前把 DeletedFlag 置为自身 id，使唯一索引只约束活跃行。
+func (v *Version) BeforeDelete(tx *gorm.DB) error {
+	if v.ID == 0 {
+		return nil
+	}
+	return tx.Model(&Version{}).Where("id = ?", v.ID).
+		UpdateColumn("deleted_flag", gorm.Expr("id")).Error
 }
 
 // IsPublished 是否处于已发布状态。
@@ -242,13 +256,13 @@ type File struct {
 
 // User 后台用户。
 type User struct {
-	ID           uint       `json:"id" gorm:"primaryKey"`
-	Username     string     `json:"username" gorm:"size:64;not null;uniqueIndex"`
-	Password     string     `json:"-" gorm:"size:128;not null"`
-	DisplayName  string     `json:"displayName" gorm:"size:64"`
-	Role         Role       `json:"role" gorm:"size:16;not null;default:viewer"`
-	IsActive     bool       `json:"isActive" gorm:"not null;default:true"`
-	LastLoginAt  *time.Time `json:"lastLoginAt"`
+	ID          uint       `json:"id" gorm:"primaryKey"`
+	Username    string     `json:"username" gorm:"size:64;not null;uniqueIndex"`
+	Password    string     `json:"-" gorm:"size:128;not null"`
+	DisplayName string     `json:"displayName" gorm:"size:64"`
+	Role        Role       `json:"role" gorm:"size:16;not null;default:viewer"`
+	IsActive    bool       `json:"isActive" gorm:"not null;default:true"`
+	LastLoginAt *time.Time `json:"lastLoginAt"`
 	// TokenVersion 自增即可吊销该用户已签发的全部令牌。
 	TokenVersion       int       `json:"-" gorm:"not null;default:1"`
 	MustChangePassword bool      `json:"mustChangePassword" gorm:"not null;default:false"`

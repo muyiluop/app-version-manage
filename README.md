@@ -118,6 +118,24 @@ docker compose --profile s3 up -d --build         # 使用 MinIO
 | `APPV_ADMIN_INITIAL_PASSWORD` | 首次启动的管理员口令 | 随机 |
 | `APPV_UPLOAD_MAX_SIZE_MB` | 单文件上限 | 4096 |
 
+## 数据迁移（换库 / 换存储）
+
+`cmd/migrate` 用于把**旧 SQLite + 本地目录**搬到**新数据库 + 新存储**（例如迁到
+PostgreSQL + MinIO）。启动时的原地 schema 升级与它是两条路径，互不影响。
+
+```bash
+cd backend
+# 先看计划（不写入任何数据）
+go run ./cmd/migrate -src-db ../data/app_version.db -src-files ../static/uploads -dry-run
+# 正式执行（目标由 -config / APPV_* 决定）
+go run ./cmd/migrate -src-db ../data/app_version.db -src-files ../static/uploads
+```
+
+特性：保留旧 ID 与分享令牌（旧分享链接继续可用）、文件按 sha256 重新分片并去重、
+可重复执行（目标已存在则跳过）、缺失对象逐条告警、自动修正 PostgreSQL/MySQL 自增序列。
+
+完整参数、校验步骤、回滚与已知限制见 **[docs/migration.md](docs/migration.md)**。
+
 ## 数据迁移与兼容
 
 - 迁移**只增不改**：只新增表、列与索引，绝不重建或删除已有数据，可安全回滚到旧镜像。

@@ -13,11 +13,11 @@ import (
 
 // RateLimiter 基于令牌桶的按 key 限流器。
 type RateLimiter struct {
-	mu       sync.Mutex
-	entries  map[string]*entry
-	limit    rate.Limit
-	burst    int
-	lastGC   time.Time
+	mu      sync.Mutex
+	entries map[string]*entry
+	limit   rate.Limit
+	burst   int
+	lastGC  time.Time
 }
 
 type entry struct {

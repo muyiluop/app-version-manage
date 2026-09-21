@@ -20,7 +20,8 @@ ENV GOPROXY=https://goproxy.cn,direct
 RUN go mod download
 COPY backend/ ./
 ENV CGO_ENABLED=0 GOOS=linux GOARCH=amd64
-RUN go build -trimpath -ldflags "-s -w" -o /out/appv ./cmd/server
+RUN go build -trimpath -ldflags "-s -w" -o /out/appv ./cmd/server && \
+    go build -trimpath -ldflags "-s -w" -o /out/appv-migrate ./cmd/migrate
 
 ### Stage 3: 运行镜像
 FROM nginx:1.27-alpine
@@ -38,11 +39,13 @@ WORKDIR /app
 
 COPY --from=frontend-builder /build/frontend/dist /app/www
 COPY --from=backend-builder /out/appv /app/appv
+# 迁移工具：目标库/对象存储只在容器网络内可达时，可直接在容器里执行迁移
+COPY --from=backend-builder /out/appv-migrate /app/appv-migrate
 COPY deploy/nginx.conf /etc/nginx/conf.d/default.conf
 COPY deploy/entrypoint.sh /docker-entrypoint.sh
 COPY deploy/config.yaml /app/config.yaml
 
-RUN chmod +x /app/appv /docker-entrypoint.sh && mkdir -p /data/uploads
+RUN chmod +x /app/appv /app/appv-migrate /docker-entrypoint.sh && mkdir -p /data/uploads
 
 # 生产模式默认值；敏感项（JWT_SECRET 等）必须由运行时环境变量注入
 ENV APPV_SERVER_MODE=release \

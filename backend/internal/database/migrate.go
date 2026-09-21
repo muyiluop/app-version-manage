@@ -39,6 +39,7 @@ var migrations = []Migration{
 	{Version: "0002", Name: "backfill_v2_fields", Up: migrationBackfill},
 	{Version: "0003", Name: "ensure_default_channels", Up: migrationDefaultChannels},
 	{Version: "0004", Name: "ensure_admin_role", Up: migrationEnsureAdminRole},
+	{Version: "0005", Name: "rebuild_version_unique_index", Up: migrationRebuildVersionIndex},
 }
 
 // Migrate 执行所有未应用的迁移。
@@ -54,6 +55,12 @@ func Migrate(db *gorm.DB, log *slog.Logger) error {
 	}
 	for _, r := range records {
 		applied[r.Version] = true
+	}
+
+	// 每次启动都先把「表 + 列」与当前模型对齐（只增不改），
+	// 这样后续迁移引用的新列一定存在；索引交由迁移在数据清理之后创建。
+	if err := ensureSchemaColumns(db); err != nil {
+		return fmt.Errorf("同步表结构失败: %w", err)
 	}
 
 	for _, m := range migrations {

@@ -186,11 +186,11 @@ func (s *Store) GetVersion(ctx context.Context, id uint) (*model.Version, error)
 
 // VersionFilter 版本列表过滤条件。
 type VersionFilter struct {
-	AppID    uint
-	Platform model.Platform
-	Channel  string
-	Status   model.VersionStatus
-	Keyword  string
+	AppID           uint
+	Platform        model.Platform
+	Channel         string
+	Status          model.VersionStatus
+	Keyword         string
 	IncludeArchived bool
 }
 
@@ -312,7 +312,13 @@ func (s *Store) VersionExists(ctx context.Context, appID uint, platform model.Pl
 
 // SoftDeleteVersion 软删除版本。
 func (s *Store) SoftDeleteVersion(ctx context.Context, id uint) error {
-	return s.db.WithContext(ctx).Delete(&model.Version{}, id).Error
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var version model.Version
+		if err := tx.First(&version, id).Error; err != nil {
+			return err
+		}
+		return tx.Delete(&version).Error
+	})
 }
 
 // IncrementDownloadCount 下载计数 +1。
