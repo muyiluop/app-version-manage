@@ -1,28 +1,64 @@
-# 容器内默认配置模板。
+# =============================================================================
+# 容器内默认配置（镜像构建时作为 /app/config.yaml 打包进镜像）
 #
-# 说明：
-#   · 真实配置文件 deploy/config.yaml 已被 .gitignore 忽略，**不要把它提交进仓库**；
-#     需要本地覆盖时复制一份即可：cp deploy/config.example.yaml deploy/config.yaml
-#   · 镜像构建使用本文件作为 /app/config.yaml（见 deploy/Dockerfile）；
-#   · 密钥一律通过 APPV_* 环境变量注入（优先级高于本文件），
-#     缺失时生产模式会拒绝启动，entrypoint.sh 也会给出提示。
-#   · 首次启动会自动建表：SQLite 文件会自动创建；若改用 PostgreSQL/MySQL，
-#     数据库本身需先手工创建（表会自动建）。
+# 注意：本文件是「给容器用的」，默认值必须指向数据卷：
+#     mode: release、SQLite 落在 /data、上传落在 /data/uploads
+#   —— 若把开发用的相对路径（./data、./static/uploads）搬进来，数据会写进容器
+#      可写层而不是数据卷，容器重建即丢失。
+#
+# 完整配置项说明（PostgreSQL/MySQL/S3 的各种写法）见仓库中的
+#     backend/config.example.yaml
+# 或镜像内的 /app/config.full-example.yaml。
+#
+# 密钥一律通过 APPV_* 环境变量注入（优先级高于本文件）；缺失时生产模式会拒绝启动。
+#
+# 需要本地覆盖时：复制一份 deploy/config.yaml（已被 .gitignore 忽略）再改。
+# =============================================================================
+
 server:
   port: 9080
+  # release：关闭调试输出，并要求 JWT / 下载签名密钥显式提供且长度 >= 16
   mode: release
+  trustedProxies:
+    - 127.0.0.1
+    - "::1"
 
 database:
-  # 也可改为 postgres / mysql，并通过 APPV_DATABASE_DSN 提供连接串
+  # 也可改为 postgres / mysql，并通过 APPV_DATABASE_DSN 注入连接串
   driver: sqlite
   path: /data/app_version.db
 
+# 示例：改用内网 PostgreSQL（数据库需先手工创建，表会自动建）
+# database:
+#   driver: postgres
+#   dsn: "host=127.0.0.1 port=5432 user=appv password=*** dbname=appv sslmode=disable TimeZone=Asia/Shanghai"
+#   maxOpenConns: 20
+#   maxIdleConns: 5
+
+# 示例：改用 MySQL（charset 与 parseTime 必须带上）
+# database:
+#   driver: mysql
+#   dsn: "appv:***@tcp(127.0.0.1:3306)/appv?charset=utf8mb4&parseTime=True&loc=Local"
+
 storage:
-  # 也可改为 s3（MinIO / AWS S3），并通过 APPV_STORAGE_S3_* 注入连接参数
+  # 也可改为 s3（MinIO / AWS S3），通过 APPV_STORAGE_S3_* 注入连接参数
   driver: local
   local:
     root: /data/uploads
   signedUrlTtlMinutes: 30
+
+# 示例：改用 MinIO（自建通常 path-style + 明文 HTTP）
+# storage:
+#   driver: s3
+#   s3:
+#     endpoint: minio:9000
+#     region: us-east-1
+#     bucket: appv
+#     accessKey: minioadmin
+#     secretKey: ***
+#     useSsl: false
+#     forcePathStyle: true
+#     prefix: appv
 
 log:
   level: info

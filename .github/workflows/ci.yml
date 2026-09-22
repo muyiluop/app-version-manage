@@ -5,44 +5,15 @@ on:
     branches: ["**"]
   pull_request:
 
-jobs:
-  backend:
-    name: 后端检查与测试
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: backend
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: "1.26.x"
-          cache-dependency-path: backend/go.sum
-      - name: go vet
-        run: go vet ./...
-      - name: go test (含竞态检测)
-        run: go test -race ./...
+# 同一分支的旧构建自动取消，省 runner
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
-  frontend:
-    name: 前端类型检查、测试与构建
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-      - run: npm ci
-      - name: 类型检查
-        # 必须用 tsc -b：根 tsconfig 是 solution 风格，npx tsc --noEmit 不会检查任何文件
-        run: npm run typecheck
-      - name: 单元测试
-        run: npm run test
-      - name: Lint
-        run: npm run lint
-      - name: 构建
-        run: npm run build
+permissions:
+  contents: read
+
+jobs:
+  # 全部规则集中在可复用 workflow 中，与「发布镜像」时用的是同一套
+  verify:
+    uses: ./.github/workflows/verify.yml

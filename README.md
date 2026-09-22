@@ -89,6 +89,15 @@ docker compose up -d --build
 # 访问 http://localhost:8081
 ```
 
+镜像构建细节（`deploy/Dockerfile`）：
+
+- 多阶段：npm 构建前端 → go 构建后端（`appv` 与迁移工具 `appv-migrate`）→ 运行镜像（nginx + 后端）
+- 支持多架构：用 `TARGETARCH` 而不是写死 amd64，可构建 `linux/amd64,linux/arm64`
+- 依赖与编译使用 BuildKit cache mount，重复构建快很多（需要 BuildKit，即 `DOCKER_BUILDKIT=1`）
+- 运行镜像内只有**不含密钥**的配置模板（`deploy/config.example.yaml`），密钥一律走 `APPV_*` 环境变量；
+  完整配置说明同时打进镜像：`/app/config.full-example.yaml`
+- 容器内 PID 1 是 `deploy/entrypoint.sh`，负责把停止信号转发给后端做优雅退出
+
 可选组件：
 
 ```bash
@@ -193,7 +202,18 @@ npm run lint
 npm run build            # tsc -b && vite build
 ```
 
-CI（`.github/workflows/ci.yml`）在每次推送时执行以上检查。
+CI 在每次推送/PR 时执行以上检查，规则集中在可复用的
+[`.github/workflows/verify.yml`](.github/workflows/verify.yml) —— 发布镜像时用的是同一套，
+避免两处规则漂移。发布 tag/release 时：
+
+| 工作流 | 作用 |
+| --- | --- |
+| [`.github/workflows/docker-image.yml`](.github/workflows/docker-image.yml) | 过门禁 → 构建 amd64+arm64 → 推送 GHCR → **起容器做冒烟验证** |
+| [`.gitea/workflows/docker-image.yml`](.gitea/workflows/docker-image.yml) | 同上，推送自建 Gitea 镜像仓库 |
+
+两条流程的冒烟验证都会真正启动镜像，检查 `/readyz` 并调用一次登录接口 ——
+用于确认「自动建表 + 初始管理员 + 鉴权链路」在容器里确实可用。
+另外只有**正式发布**才会移动 `latest` 标签，预发布不会把 `latest` 指向测试版本。
 
 ## 运维
 

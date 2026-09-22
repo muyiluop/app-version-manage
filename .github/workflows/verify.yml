@@ -1,0 +1,61 @@
+name: Verify
+
+# 可复用的质量门禁：CI 与「发布镜像」流程都调用它，避免两处规则各写一份而漂移。
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: 后端（gofmt / vet / 测试）
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          # 直接跟随 go.mod 的 go 指令，避免两处版本号各写一份
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: gofmt 检查
+        run: |
+          unformatted=$(gofmt -l ./cmd ./internal)
+          if [ -n "$unformatted" ]; then
+            echo "以下文件未格式化，请执行 gofmt -w："
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: 单元测试（含竞态检测）
+        run: go test -race ./...
+
+  frontend:
+    name: 前端（类型 / 测试 / lint / 构建）
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+      # 必须用 npm run typecheck（tsc -b）：solution 风格 tsconfig 下 npx tsc 不检查任何文件
+      - run: npm run typecheck
+      - run: npm run test
+      - run: npm run lint
+      - run: npm run build

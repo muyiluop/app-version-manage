@@ -1,0 +1,23 @@
+# 统一换行符。
+#
+# 背景：仓库在 Windows 上开发、在 Linux 上构建镜像。若 shell 脚本被检出为 CRLF，
+# 容器里的 "#!/bin/sh" 会带上 \r 导致脚本无法执行；而 Git 的 core.autocrlf
+# 默认就会做这种转换。这里对「必须 LF」的文件类型显式固定。
+
+# 容器与脚本：必须 LF
+*.sh          text eol=lf
+Dockerfile    text eol=lf
+*.dockerignore text eol=lf
+
+# 配置与工作流：统一 LF，避免 diff 噪声
+*.yaml        text eol=lf
+*.yml         text eol=lf
+
+# 源码：统一 LF
+*.go          text eol=lf
+*.ts          text eol=lf
+*.tsx         text eol=lf
+*.js          text eol=lf
+*.css         text eol=lf
+*.json        text eol=lf
+*.md          text eol=lf

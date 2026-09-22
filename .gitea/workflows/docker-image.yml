@@ -1,14 +1,31 @@
 name: Build and Push Docker Image
 
+# 发布镜像：打 release 时构建并推送到 Gitea 内置镜像仓库，随后起容器做冒烟验证。
+#
+# 说明：
+#   · 质量门禁（gofmt/vet/测试/前端类型检查）在 .github/workflows/verify.yml 中定义，
+#     Gitea 侧不重复实现；本流程自身也会编译前后端，编译不过同样会被拦住；
+#   · 构建使用 BuildKit（Dockerfile 里有 cache mount），因此显式设置 DOCKER_BUILDKIT=1。
 on:
   release:
     types: [published]
   workflow_dispatch:
     inputs:
       version:
-        description: "Version tag to build (overrides release tag)"
+        description: "要构建的版本标签（覆盖 release 标签）"
         required: false
         default: ""
+
+# 同一 ref 的镜像构建串行执行，避免并发推送互相覆盖
+concurrency:
+  group: image-gitea-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # 改成你自己的 Gitea 地址与端口
+  REGISTRY: git.dev.smartmeter.vip:8880
+  # 镜像名 = <registry>/<owner>/<repo>
+  IMAGE_NAME: git.dev.smartmeter.vip:8880/${{ github.repository }}
 
 jobs:
   build-and-push:
@@ -16,42 +33,98 @@ jobs:
     permissions:
       contents: read
       packages: write
-      id-token: write
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Determine version tag
+      - name: 解析版本标签
         id: vars
         run: |
           if [ -n "${{ github.event.release.tag_name }}" ]; then
-            echo "tag=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
+            TAG="${{ github.event.release.tag_name }}"
+            PRERELEASE="${{ github.event.release.prerelease }}"
+          elif [ -n "${{ github.event.inputs.version }}" ]; then
+            TAG="${{ github.event.inputs.version }}"
+            PRERELEASE="false"
           else
-            if [ -n "${{ github.event.inputs.version }}" ]; then
-              echo "tag=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
-            else
-              echo "tag=latest" >> $GITHUB_OUTPUT
-            fi
+            TAG="latest"
+            PRERELEASE="true"
           fi
-      - name: Log in to Gitea Container Registry
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "prerelease=$PRERELEASE" >> $GITHUB_OUTPUT
+          echo "构建标签：$TAG（预发布=$PRERELEASE）"
+
+      - name: 登录 Gitea 镜像仓库
         uses: docker/login-action@v3
         with:
-          # 使用你 Gitea 的实际域名
-          registry: git.dev.smartmeter.vip:8880
+          registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          # 优先 GITEA_TOKEN，兼容原先使用的 DOCKERHUB_TOKEN 名称
+          password: ${{ secrets.GITEA_TOKEN || secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push image
+      - name: 构建镜像
+        env:
+          DOCKER_BUILDKIT: "1"
         run: |
-          # 直接使用宿主机原生的 docker 命令
-          IMAGE_NAME=git.dev.smartmeter.vip:8880/${{ github.repository }}
-          TAG=${{ steps.vars.outputs.tag }}
+          set -e
+          TAG="${{ steps.vars.outputs.tag }}"
+          # 用宿主机原生 docker（自建 runner 上最省事）
+          docker build \
+            --pull \
+            --build-arg VERSION="$TAG" \
+            --build-arg REVISION="${{ github.sha }}" \
+            -t "${{ env.IMAGE_NAME }}:$TAG" \
+            -f deploy/Dockerfile .
+          docker images "${{ env.IMAGE_NAME }}"
 
-          docker build -t ${IMAGE_NAME}:${TAG} -t ${IMAGE_NAME}:latest -f deploy/Dockerfile .
-          docker push ${IMAGE_NAME}:${TAG}
-          docker push ${IMAGE_NAME}:latest
-
-      - name: Output image
+      - name: 推送镜像
         run: |
-          echo "Image pushed: git.dev.smartmeter.vip:8880/${{ github.repository }}:${{ steps.vars.outputs.tag }}"
+          set -e
+          TAG="${{ steps.vars.outputs.tag }}"
+          docker push "${{ env.IMAGE_NAME }}:$TAG"
+
+          # 只有正式发布才移动 latest，避免预发布把 latest 指向测试版本
+          if [ "${{ steps.vars.outputs.prerelease }}" != "true" ] && [ "$TAG" != "latest" ]; then
+            docker tag "${{ env.IMAGE_NAME }}:$TAG" "${{ env.IMAGE_NAME }}:latest"
+            docker push "${{ env.IMAGE_NAME }}:latest"
+            echo "已同时更新 latest"
+          fi
+
+      - name: 冒烟验证（起容器 + 健康检查 + 登录）
+        run: |
+          set -e
+          TAG="${{ steps.vars.outputs.tag }}"
+          IMAGE="${{ env.IMAGE_NAME }}:$TAG"
+
+          docker rm -f appv-smoke >/dev/null 2>&1 || true
+          docker run -d --name appv-smoke -p 18080:80 \
+            -e APPV_JWT_SECRET="$(openssl rand -hex 32)" \
+            -e APPV_DOWNLOAD_TOKEN_KEY="$(openssl rand -hex 32)" \
+            -e APPV_ADMIN_INITIAL_PASSWORD=smoke-123456 \
+            "$IMAGE"
+
+          ok=0
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:18080/readyz >/dev/null 2>&1; then ok=1; break; fi
+            sleep 2
+          done
+
+          echo "--- 容器日志 ---"
+          docker logs appv-smoke || true
+
+          if [ "$ok" != "1" ]; then
+            echo "镜像健康检查未通过"
+            docker rm -f appv-smoke || true
+            exit 1
+          fi
+
+          # 再验登录：确认自动建表、初始管理员与鉴权链路都正常
+          curl -fsS -X POST http://127.0.0.1:18080/api/v2/auth/login \
+            -H 'Content-Type: application/json' \
+            -d '{"username":"admin","password":"smoke-123456"}' >/dev/null
+
+          echo "镜像冒烟验证通过（自动建表 / 初始管理员 / 登录均正常）"
+          docker rm -f appv-smoke || true
+
+      - name: 输出结果
+        run: |
+          echo "已推送：${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.tag }}"
