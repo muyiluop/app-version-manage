@@ -19,7 +19,7 @@ interface FormValues {
 
 export default function ChangePassword() {
   const [form] = Form.useForm<FormValues>();
-  const { user, logout } = useAuth();
+  const { user, logout, updateUser } = useAuth();
   const navigate = useNavigate();
   const { message } = AntApp.useApp();
   const [submitting, setSubmitting] = useState(false);
@@ -29,9 +29,12 @@ export default function ChangePassword() {
     setSubmitting(true);
     setError("");
     try {
-      await changePassword(values.oldPassword, values.newPassword);
+      const result = await changePassword(values.oldPassword, values.newPassword);
+      // 先用后端返回的权威状态同步本地用户，守卫就不会再判定"需要改密"，
+      // 也就不会把 /change-password 写进登录页的 ?redirect=（否则登录后又被送回来）。
+      updateUser(result.user);
+      message.success(result.message || "密码已修改，请重新登录");
       logout();
-      message.success("密码已修改，请重新登录");
       navigate("/login", { replace: true });
     } catch (err) {
       setError(getErrorMessage(err) || "修改密码失败");

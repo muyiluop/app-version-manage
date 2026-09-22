@@ -11,8 +11,10 @@ backend/app_version_manage.exe
 backend/static/uploads/*
 !backend/static/uploads/.gitkeep
 
-# 数据库文件
+# 数据库文件（含 SQLite WAL 运行期副产物）
 backend/data/*.db
+backend/data/*.db-wal
+backend/data/*.db-shm
 
 # 部署目录
 deploy/*

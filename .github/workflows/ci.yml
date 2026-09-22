@@ -24,7 +24,7 @@ jobs:
         run: go test -race ./...
 
   frontend:
-    name: 前端类型检查与构建
+    name: 前端类型检查、测试与构建
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -38,7 +38,10 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - name: 类型检查
-        run: npx tsc --noEmit
+        # 必须用 tsc -b：根 tsconfig 是 solution 风格，npx tsc --noEmit 不会检查任何文件
+        run: npm run typecheck
+      - name: 单元测试
+        run: npm run test
       - name: Lint
         run: npm run lint
       - name: 构建

@@ -116,11 +116,13 @@ func (h *Handler) ChangePassword(c *gin.Context) {
 	if !h.bindJSON(c, &req) {
 		return
 	}
-	if err := h.svc.Auth.ChangePassword(c.Request.Context(), user.ID, req.OldPassword, req.NewPassword); err != nil {
+	profile, err := h.svc.Auth.ChangePassword(c.Request.Context(), user.ID, req.OldPassword, req.NewPassword)
+	if err != nil {
 		apierr.Fail(c, err)
 		return
 	}
-	apierr.OK(c, gin.H{"message": "密码已更新，请重新登录"})
+	// 同时返回最新用户信息，前端据此同步 mustChangePassword，避免继续按旧状态引导改密。
+	apierr.OK(c, gin.H{"message": "密码已更新，请重新登录", "user": profile})
 }
 
 // Profile 返回当前用户信息。

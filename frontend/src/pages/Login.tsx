@@ -7,16 +7,11 @@ import { LockOutlined, UserOutlined } from "@ant-design/icons";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { getErrorMessage } from "../api/client";
 import { useAuth } from "../features/auth/AuthContext";
+import { safeRedirect } from "../utils/redirect";
 
 interface FormValues {
   username: string;
   password: string;
-}
-
-/** 只允许站内相对路径回跳，避免开放重定向。 */
-function safeRedirect(raw: string | null): string {
-  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "/apps";
-  return raw;
 }
 
 export default function Login() {

@@ -44,6 +44,11 @@ export interface MessageResult {
   message: string;
 }
 
+/** 修改密码结果：附带更新后的用户信息，便于前端同步 mustChangePassword。 */
+export interface ChangePasswordResult extends MessageResult {
+  user: UserProfile;
+}
+
 // ---------- 认证 ----------
 
 /** 当前登录用户信息，对应 GET /v2/auth/profile。 */

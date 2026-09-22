@@ -1,5 +1,5 @@
 import { client } from "./client";
-import type { LoginResult, MessageResult, UserProfile } from "../types/api";
+import type { ChangePasswordResult, LoginResult, UserProfile } from "../types/api";
 
 /** 登录：401 属预期分支，由页面提示，不触发全局跳转。 */
 export function login(username: string, password: string): Promise<LoginResult> {
@@ -16,7 +16,7 @@ export function profile(): Promise<UserProfile> {
   return client.get<UserProfile>("/v2/auth/profile", { skipAuthRedirect: true });
 }
 
-/** 修改密码，成功后旧令牌全部失效。 */
-export function changePassword(oldPassword: string, newPassword: string): Promise<MessageResult> {
-  return client.post<MessageResult>("/v2/auth/change-password", { oldPassword, newPassword });
+/** 修改密码，成功后旧令牌全部失效；返回更新后的用户信息。 */
+export function changePassword(oldPassword: string, newPassword: string): Promise<ChangePasswordResult> {
+  return client.post<ChangePasswordResult>("/v2/auth/change-password", { oldPassword, newPassword });
 }

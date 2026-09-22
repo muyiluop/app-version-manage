@@ -28,7 +28,7 @@
 | POST | `/api/v2/auth/login` | 公开 | body `{username,password}` → `{accessToken,refreshToken,expiresAt,user}` |
 | POST | `/api/v2/auth/refresh` | 公开 | body `{refreshToken}` |
 | GET | `/api/v2/auth/profile` | 登录 | 当前用户 |
-| POST | `/api/v2/auth/change-password` | 登录 | body `{oldPassword,newPassword}`；成功后旧令牌全部失效 |
+| POST | `/api/v2/auth/change-password` | 登录 | body `{oldPassword,newPassword}`；返回 `{message,user}`（其中 `user.mustChangePassword=false`）；成功后旧令牌全部失效 |
 
 `user`：`{id,username,displayName,role,mustChangePassword,lastLoginAt}`。
 `mustChangePassword=true` 时前端应引导改密。

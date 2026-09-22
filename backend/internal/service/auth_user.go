@@ -150,35 +150,43 @@ func (s *AuthService) Authenticate(ctx context.Context, claims *Claims) (*model.
 }
 
 // ChangePassword 修改当前用户密码，并使已签发的令牌全部失效。
-func (s *AuthService) ChangePassword(ctx context.Context, userID uint, oldPassword, newPassword string) error {
+//
+// 返回更新后的用户信息：前端改密成功后需要立刻拿到权威的 mustChangePassword=false，
+// 否则仍会按本地旧状态把用户判定为"需要改密"。
+func (s *AuthService) ChangePassword(ctx context.Context, userID uint, oldPassword, newPassword string) (*UserProfile, error) {
 	if len(strings.TrimSpace(newPassword)) < 6 {
-		return apierr.BadRequest("新密码长度不能少于 6 位")
+		return nil, apierr.BadRequest("新密码长度不能少于 6 位")
 	}
 
 	user, err := s.store.GetUserByID(ctx, userID)
 	if err != nil {
-		return notFoundOr(err, "用户不存在")
+		return nil, notFoundOr(err, "用户不存在")
 	}
 	if !verifyUserPassword(user.Password, oldPassword) {
-		return apierr.BadRequest("原密码错误")
+		return nil, apierr.BadRequest("原密码错误")
 	}
 
 	hash, err := hashUserPassword(newPassword)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if err := s.store.UpdateUserFields(ctx, user.ID, map[string]any{
 		"password":             hash,
 		"must_change_password": false,
 	}); err != nil {
-		return internal("更新密码失败", err)
+		return nil, internal("更新密码失败", err)
 	}
 	if err := s.store.BumpTokenVersion(ctx, user.ID); err != nil {
-		return internal("吊销令牌失败", err)
+		return nil, internal("吊销令牌失败", err)
 	}
 
 	s.audit(ctx, "auth.change_password", "user", uid(user.ID), "修改密码", nil, true)
-	return nil
+
+	updated, err := s.store.GetUserByID(ctx, userID)
+	if err != nil {
+		return nil, notFoundOr(err, "用户不存在")
+	}
+	return Profile(updated), nil
 }
 
 // issueTokens 签发新的令牌对。
