@@ -66,6 +66,8 @@ type S3Options struct {
 	UseSSL         bool
 	ForcePathStyle bool
 	Prefix         string
+	// PublicEndpoint 为浏览器可达的对象存储地址（含 scheme）；留空表示不下发预签名地址。
+	PublicEndpoint string
 }
 
 // New 依据配置构造存储实现。

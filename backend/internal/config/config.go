@@ -134,6 +134,15 @@ type S3Storage struct {
 	UseSSL         *bool  `yaml:"useSsl"`
 	ForcePathStyle *bool  `yaml:"forcePathStyle"`
 	Prefix         string `yaml:"prefix"`
+	// PublicEndpoint 是「浏览器能访问到」的对象存储地址（如 https://files.example.com）。
+	//
+	// 留空（默认）时不再向浏览器下发预签名直连地址，所有读取都经后端代理：
+	// 这是内网 MinIO 的标准做法——Endpoint 往往是内网 IP 且是明文 HTTP，
+	// 交给 HTTPS 页面去加载会被浏览器按「混合内容」拦掉，即便不拦也无法访问。
+	//
+	// 只有当对象存储确实对浏览器可达（独立域名 + HTTPS 反代）时才填写，
+	// 填写后大文件下载会 302 到该地址，由对象存储直接承担流量。
+	PublicEndpoint string `yaml:"publicEndpoint"`
 }
 
 // LogConfig 日志配置。
@@ -327,6 +336,9 @@ func merge(base, file *Config) {
 	if file.Storage.S3.Prefix != "" {
 		base.Storage.S3.Prefix = file.Storage.S3.Prefix
 	}
+	if file.Storage.S3.PublicEndpoint != "" {
+		base.Storage.S3.PublicEndpoint = file.Storage.S3.PublicEndpoint
+	}
 	if file.Storage.SignedURLTTLMinutes != 0 {
 		base.Storage.SignedURLTTLMinutes = file.Storage.SignedURLTTLMinutes
 	}
@@ -395,6 +407,7 @@ func applyEnv(cfg *Config) {
 	if v := envBoolPtr("STORAGE_S3_USE_SSL"); v != nil {
 		cfg.Storage.S3.UseSSL = v
 	}
+	cfg.Storage.S3.PublicEndpoint = envString(cfg.Storage.S3.PublicEndpoint, "STORAGE_S3_PUBLIC_ENDPOINT")
 	if v := envBoolPtr("STORAGE_S3_FORCE_PATH_STYLE"); v != nil {
 		cfg.Storage.S3.ForcePathStyle = v
 	}

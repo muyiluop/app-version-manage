@@ -164,6 +164,28 @@ docker compose --profile s3 up -d --build         # 使用 MinIO
 | `APPV_ADMIN_INITIAL_PASSWORD` | 首次启动的管理员口令 | 随机 |
 | `APPV_UPLOAD_MAX_SIZE_MB` | 单文件上限 | 4096 |
 
+### 图标与文件下载：为什么默认经后端代理
+
+应用图标的地址是前端拼出来的同源路径：`/api/static/logos/<对象键>`。后端拿到请求后：
+
+- **本地存储**：直接流式代理（一向如此）；
+- **S3 / MinIO**：默认也走代理。**只有在配置了 `storage.s3.publicEndpoint`
+  （浏览器可达的地址）时**，才会 302 跳到预签名直连地址。
+
+为什么默认不直连：`storage.s3.endpoint` 通常是**内网 IP + 明文 HTTP**。
+把它作为 `<img src>` 交给 HTTPS 页面，会被浏览器按「混合内容」直接拦掉
+（控制台表现为图片请求被重定向到内网地址后失败）；即便不拦，公网/外网浏览器也访问不到内网地址。
+后端代理虽然多占一点带宽，但**在 HTTPS 与内网对象存储下是唯一始终正确的做法**。
+
+想恢复直连（让对象存储承担大文件流量）需要两个前提，缺一不可：
+
+1. 对象存储对浏览器可达：独立域名 + HTTPS 反向代理到 MinIO（如 `files.example.com`）；
+2. 配置 `APPV_STORAGE_S3_PUBLIC_ENDPOINT=https://files.example.com`。
+
+地址必须带 `http://` 或 `https://`，且**不能带路径前缀**：SigV4 签名覆盖 Host 头，
+不能先按内网地址签名再改写域名，只能用对外地址签名，因此客户端会另建一个
+"仅用于签名"的连接。
+
 ## 数据迁移（换库 / 换存储）
 
 `cmd/migrate` 用于把**旧 SQLite + 本地目录**搬到**新数据库 + 新存储**（例如迁到

@@ -142,6 +142,14 @@ storage:
     forcePathStyle: true
     # 对象键前缀，所有文件都会落在 <prefix>/ 下（便于与其他业务共用一个 bucket）
     prefix: appv
+    # 【重要】浏览器可达的对象存储地址（含 scheme），如 https://files.example.com。
+    #
+    # 留空（默认，内网 MinIO 请保持留空）：不下发预签名直连地址，图标与下载
+    #   全部经后端代理。endpoint 多为内网 IP + 明文 HTTP，交给 HTTPS 页面加载
+    #   会被浏览器按「混合内容」拦截——表现为「切换到 HTTPS 后图片不显示」。
+    # 填写：仅当对象存储对浏览器可达（独立域名 + HTTPS 反代到 MinIO）。
+    #   填写后下载 302 到该地址，由对象存储承担流量。
+    publicEndpoint: ""
 
 # --- 示例 C：MinIO（自建，path-style + 明文 HTTP） ----------------------------
 # storage:

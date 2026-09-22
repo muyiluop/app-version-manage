@@ -117,6 +117,7 @@ func main() {
 			SecretKey:      cfg.Storage.S3.SecretKey,
 			UseSSL:         cfg.Storage.S3.UseSSLEnabled(),
 			ForcePathStyle: cfg.Storage.S3.ForcePathStyleEnabled(),
+			PublicEndpoint: cfg.Storage.S3.PublicEndpoint,
 			Prefix:         cfg.Storage.S3.Prefix,
 		},
 		SignedURLTTL: time.Duration(cfg.Storage.SignedURLTTLMinutes) * time.Minute,

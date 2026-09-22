@@ -14,7 +14,9 @@ import (
 
 // s3Storage 基于 MinIO 客户端实现，兼容 MinIO、AWS S3 及其他 S3 协议对象存储。
 type s3Storage struct {
-	client  *minio.Client
+	client *minio.Client
+	// presign 用于生成「浏览器可达」的预签名地址；为 nil 表示不预签名（一律经后端代理）。
+	presign *minio.Client
 	bucket  string
 	prefix  string
 	urlTTL  time.Duration
@@ -69,13 +71,23 @@ func newS3(opts S3Options, urlTTL time.Duration) (*s3Storage, error) {
 		}
 	}
 
-	return &s3Storage{
+	st := &s3Storage{
 		client:  client,
 		bucket:  opts.Bucket,
 		prefix:  strings.Trim(opts.Prefix, "/"),
 		urlTTL:  urlTTL,
 		usePath: opts.ForcePathStyle,
-	}, nil
+	}
+	// 只有配置了「浏览器可达」的地址才启用预签名直连；否则 PresignGet 返回空串，
+	// 调用方回落到后端流式代理 —— 内网 MinIO + HTTPS 前端下的正确行为。
+	if strings.TrimSpace(opts.PublicEndpoint) != "" {
+		presign, err := newPresignClient(opts)
+		if err != nil {
+			return nil, err
+		}
+		st.presign = presign
+	}
+	return st, nil
 }
 
 // Driver 返回驱动名。
@@ -159,7 +171,14 @@ func (s *s3Storage) Stat(ctx context.Context, key string) (*Object, error) {
 }
 
 // PresignGet 生成带原始文件名的预签名下载地址。
+//
+// 未配置 storage.s3.publicEndpoint 时返回空串且不报错：调用方据此改走后端代理。
+// 原因见 S3Storage.PublicEndpoint 的说明——内网地址 + 明文 HTTP 的直连地址
+// 交给 HTTPS 页面加载会被浏览器拦截。
 func (s *s3Storage) PresignGet(ctx context.Context, key, filename string, ttl time.Duration) (string, error) {
+	if s.presign == nil {
+		return "", nil
+	}
 	name, err := s.objectName(key)
 	if err != nil {
 		return "", err
@@ -174,7 +193,7 @@ func (s *s3Storage) PresignGet(ctx context.Context, key, filename string, ttl ti
 			fmt.Sprintf("attachment; filename*=UTF-8''%s", url.PathEscape(filename)))
 	}
 
-	u, err := s.client.PresignedGetObject(ctx, s.bucket, name, ttl, params)
+	u, err := s.presign.PresignedGetObject(ctx, s.bucket, name, ttl, params)
 	if err != nil {
 		return "", fmt.Errorf("生成预签名地址失败: %w", err)
 	}
