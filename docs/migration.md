@@ -65,6 +65,70 @@ APPV_STORAGE_S3_FORCE_PATH_STYLE=true \
 | `-default-role` | 旧用户迁移后的角色，默认 `admin`（v1 无角色概念） |
 | `-batch` | 批量写入大小，默认 200 |
 
+### Docker / Compose 部署下怎么迁移
+
+镜像里已经带了迁移工具：`/app/appv-migrate`。两种跑法，按「目标能否从宿主机直连」选：
+
+**方式 A：在宿主机直接跑（目标可直连时最省事）**
+
+适合目标数据库与对象存储能从宿主机直接访问（例如内网独立部署的 PostgreSQL + MinIO）。
+`-config` 指向的文件只提供非敏感默认值，真正的「目标」由环境文件与 `APPV_*` 决定：
+
+```powershell
+cd backend
+
+# 先排练：只输出统计与告警，不写入任何数据与文件
+go run ./cmd/migrate `
+  -src-db    D:\旧版数据\data\app_version.db `
+  -src-files D:\旧版数据\static\uploads `
+  -config    config.yaml `
+  -dry-run
+
+# 确认统计无误后正式执行（去掉 -dry-run）
+go run ./cmd/migrate `
+  -src-db    D:\旧版数据\data\app_version.db `
+  -src-files D:\旧版数据\static\uploads `
+  -config    config.yaml
+```
+
+> 目标来自仓库根目录的 `.env`（在 `backend/` 下运行会自动读取 `../.env`）：
+> `APPV_DATABASE_DRIVER=postgres`、`APPV_DATABASE_DSN=...`、`APPV_STORAGE_DRIVER=s3`、
+> `APPV_STORAGE_S3_*`。因此 `config.yaml` 里写着 sqlite 也没关系 —— 环境变量优先级更高。
+
+**方式 B：在 compose 项目里跑一次性容器（目标只在容器网络内可达时）**
+
+```bash
+# 迁移期间先停掉新服务，避免并发写入
+docker compose stop app
+
+# --entrypoint 必须显式指定：
+# 镜像默认入口是启动脚本（会拉起 nginx + 后端，且不转发参数）
+docker compose run --rm --no-deps `
+  -v "D:/旧版数据:/old:ro" `
+  --entrypoint /app/appv-migrate `
+  app `
+  -src-db    /old/data/app_version.db `
+  -src-files /old/static/uploads `
+  -config    /app/config.yaml `
+  -dry-run
+
+# 去掉 -dry-run 即为正式执行；完成后 docker compose start app
+```
+
+一次性容器同样会读取 `env_file: .env` 与 `environment:`，所以**目标配置与主服务完全一致**，
+不必重复填写连接串。若目标数据库/对象存储本身就是 compose 里的服务
+（`--profile postgres` / `--profile s3`），先确保它们已启动；`--no-deps` 只是阻止顺带拉起 `app`。
+
+Windows 上挂载路径必须是 Docker Desktop 已共享的盘符；旧数据目录建议只读挂载（`:ro`）。
+
+**顺序与注意**
+
+1. **先备份**旧库（连同 `-wal` / `-shm`）与旧上传目录；
+2. 最好在**新服务首次启用之前**迁移 —— 目标库为空，无需 `-overwrite`；
+3. 若已经开始在新系统里录数据：`-overwrite` 会**清空目标库业务数据**，且本工具不是合并工具，
+   两条数据流无法自动合并；
+4. 迁移完成后启动服务并逐项校验（见第 4 节）。
+
 ## 3. 迁移做了什么
 
 **数据**
