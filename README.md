@@ -186,6 +186,19 @@ docker compose --profile s3 up -d --build         # 使用 MinIO
 不能先按内网地址签名再改写域名，只能用对外地址签名，因此客户端会另建一个
 "仅用于签名"的连接。
 
+配置后会**同时影响图片与文件下载**（二者共用同一条解析逻辑 `OpenDownload`）：
+
+- 预签名地址已带上 `response-content-disposition`，下载文件名不会变；
+- 下载计数在跳转前就已记录，统计不受影响；
+- 前端"下载版本"走的是 XHR（axios blob），跳转到**跨域**的 MinIO 需要 CORS。
+  实测 MinIO 的预签名 GET 默认返回 `Access-Control-Allow-Origin` 与完整的
+  `Access-Control-Expose-Headers`，因此默认可直接工作；若你的对象存储关闭了 CORS，
+  需放行前端域名，否则这条下载路径会失败；
+- 页面是 HTTPS 时，`publicEndpoint` **也必须是 HTTPS**，否则图片会再次被
+  「混合内容」拦掉、XHR 下载同样会被拦；
+- 预签名地址的有效期由 `storage.signedUrlTtlMinutes` 决定（默认 30 分钟）：
+  下载需在有效期内**开始**，开始后继续传输不再校验。
+
 ## 数据迁移（换库 / 换存储）
 
 `cmd/migrate` 用于把**旧 SQLite + 本地目录**搬到**新数据库 + 新存储**（例如迁到
