@@ -37,16 +37,32 @@ interface MenuEntry {
   adminOnly?: boolean;
 }
 
-const MENU_ENTRIES: MenuEntry[] = [
+// 「文件管理」暂时从侧栏隐藏。
+//
+// 原因：该页展示的其实是上传的副产物——发布产物、应用图标上传时都会写入 files 表，
+// 页面本身可做的事有限，而其中真正被依赖的「秒传去重」与「清理未使用文件」
+// 都在后端接口上，不依赖这个页面。
+//
+// 这里只摘掉菜单入口：路由 /files 与全部接口保持可用（直接访问仍可打开），
+// 需要恢复时把开关改回 true 即可。
+const SHOW_FILE_MANAGER = false;
+
+/** 全部入口：参与菜单选中与面包屑解析，即使某项不展示。 */
+const ALL_MENU_ENTRIES: MenuEntry[] = [
   { key: "/apps", label: "应用管理", icon: <AppstoreOutlined /> },
   { key: "/files", label: "文件管理", icon: <FolderOutlined /> },
   { key: "/users", label: "用户管理", icon: <TeamOutlined />, adminOnly: true },
   { key: "/audit", label: "审计日志", icon: <AuditOutlined />, adminOnly: true },
 ];
 
+/** 实际在侧栏展示的入口。 */
+const MENU_ENTRIES: MenuEntry[] = ALL_MENU_ENTRIES.filter(
+  (entry) => entry.key !== "/files" || SHOW_FILE_MANAGER
+);
+
 /** 由 pathname 推导出一级菜单 key。 */
 function resolveMenuKey(pathname: string): string {
-  const matched = MENU_ENTRIES.map((entry) => entry.key).find(
+  const matched = ALL_MENU_ENTRIES.map((entry) => entry.key).find(
     (key) => pathname === key || pathname.startsWith(`${key}/`)
   );
   return matched ?? "/apps";
@@ -57,7 +73,7 @@ function resolveBreadcrumb(pathname: string): string[] {
   const segments = pathname.split("/").filter(Boolean);
   if (segments.length === 0) return [];
   const root = resolveMenuKey(pathname);
-  const rootLabel = MENU_ENTRIES.find((entry) => entry.key === root)?.label ?? "";
+  const rootLabel = ALL_MENU_ENTRIES.find((entry) => entry.key === root)?.label ?? "";
   if (segments.length === 1) return [rootLabel];
   if (root === "/apps") {
     return [rootLabel, segments[0] === "apps" ? "应用详情" : segments[1]];
