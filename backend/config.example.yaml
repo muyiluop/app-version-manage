@@ -129,7 +129,10 @@ storage:
   signedUrlTtlMinutes: 30
   s3:
     endpoint: ""
-    region: us-east-1
+    # 留空（推荐）= 由 minio-go 探测 bucket 所在 region。
+    # 自建 MinIO 常配置了非默认 region，写死 us-east-1 会被拒绝签名，报
+    #   the region is wrong; expecting 'xxx'
+    region: ""
     bucket: ""
     accessKey: ""
     secretKey: ""
@@ -159,7 +162,7 @@ storage:
 #   driver: s3
 #   s3:
 #     endpoint: s3.ap-east-1.amazonaws.com     # 也可留空由 region 推导
-#     region: ap-east-1                        # 必须与 bucket 所在区域一致
+#     region: ap-east-1                        # 与服务端一致；留空则自动探测
 #     bucket: my-release-bucket
 #     accessKey: AKIA...
 #     secretKey: ...

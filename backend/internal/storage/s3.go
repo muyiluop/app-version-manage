@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
 // s3Storage 基于 MinIO 客户端实现，兼容 MinIO、AWS S3 及其他 S3 协议对象存储。
@@ -39,14 +38,9 @@ func newS3(opts S3Options, urlTTL time.Duration) (*s3Storage, error) {
 		lookup = minio.BucketLookupPath
 	}
 
-	client, err := minio.New(opts.Endpoint, &minio.Options{
-		Creds:        credentials.NewStaticV4(opts.AccessKey, opts.SecretKey, ""),
-		Secure:       opts.UseSSL,
-		Region:       opts.Region,
-		BucketLookup: lookup,
-	})
+	client, err := newS3Client(opts, opts.Region, lookup)
 	if err != nil {
-		return nil, fmt.Errorf("初始化 S3 客户端失败: %w", err)
+		return nil, err
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
@@ -54,11 +48,24 @@ func newS3(opts S3Options, urlTTL time.Duration) (*s3Storage, error) {
 
 	exists, err := client.BucketExists(ctx, opts.Bucket)
 	if err != nil {
-		return nil, fmt.Errorf("检查 bucket 失败: %w", err)
+		return nil, fmt.Errorf("检查 bucket 失败: %w%s", err, regionHint(err, opts.Region))
 	}
 	if !exists {
-		if err := client.MakeBucket(ctx, opts.Bucket, minio.MakeBucketOptions{Region: opts.Region}); err != nil {
-			return nil, fmt.Errorf("创建 bucket %s 失败: %w", opts.Bucket, err)
+		// 创建 bucket 时无法先探测「已存在 bucket 的位置」，所以跟随服务端在报错里
+		// 给出的期望 region 重试一次（自建 MinIO 常配置了非默认 region）。
+		mkErr := client.MakeBucket(ctx, opts.Bucket, minio.MakeBucketOptions{Region: opts.Region})
+		if mkErr != nil {
+			if expected := expectedRegion(mkErr); expected != "" && expected != opts.Region {
+				if retry, rerr := newS3Client(opts, expected, lookup); rerr == nil {
+					if rerr = retry.MakeBucket(ctx, opts.Bucket, minio.MakeBucketOptions{Region: expected}); rerr == nil {
+						client = retry
+						mkErr = nil
+					}
+				}
+			}
+		}
+		if mkErr != nil {
+			return nil, fmt.Errorf("创建 bucket %s 失败: %w%s", opts.Bucket, mkErr, regionHint(mkErr, opts.Region))
 		}
 	}
 

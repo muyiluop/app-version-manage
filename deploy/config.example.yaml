@@ -52,7 +52,7 @@ storage:
 #   driver: s3
 #   s3:
 #     endpoint: minio:9000
-#     region: us-east-1
+#     region: ""          # 留空自动探测；服务端配了 region 时也可显式填写
 #     bucket: appv
 #     accessKey: minioadmin
 #     secretKey: ***

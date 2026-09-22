@@ -181,7 +181,9 @@ func Default() *Config {
 			Local:               LocalStorage{Root: "./static/uploads"},
 			SignedURLTTLMinutes: 30,
 			S3: S3Storage{
-				Region:         "us-east-1",
+				// 默认留空：由 minio-go 探测 bucket 所在 region。
+				// 写死 us-east-1 会让配置了非默认 region 的自建 MinIO 拒绝签名
+				// （报错：the region is wrong; expecting 'xxx'）。
 				ForcePathStyle: boolPtr(true), // 默认按自建 MinIO 的常见配置
 				Prefix:         "appv",
 			},
