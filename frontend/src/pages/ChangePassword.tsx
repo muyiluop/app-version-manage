@@ -1,10 +1,12 @@
 /**
  * 修改密码页。
  *
- * 后端在改密成功后会吊销该用户的全部令牌，因此这里必须清理本地会话并回到登录页。
+ * 后端在改密成功后会吊销该用户的全部令牌，因此这里必须清理本地会话并回到登录页；
+ * 但要注意先同步 mustChangePassword，否则路由守卫会把 /change-password 写进
+ * 登录页的 ?redirect=，导致登录后又被送回本页。
  */
 import { useState } from "react";
-import { Alert, App as AntApp, Button, Card, Form, Input, Typography } from "antd";
+import { Alert, App as AntApp, Button, Form, Input } from "antd";
 import { LockOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { changePassword } from "../api/auth";
@@ -30,8 +32,7 @@ export default function ChangePassword() {
     setError("");
     try {
       const result = await changePassword(values.oldPassword, values.newPassword);
-      // 先用后端返回的权威状态同步本地用户，守卫就不会再判定"需要改密"，
-      // 也就不会把 /change-password 写进登录页的 ?redirect=（否则登录后又被送回来）。
+      // 先用后端返回的权威状态同步本地用户，守卫就不会再判定需要改密
       updateUser(result.user);
       message.success(result.message || "密码已修改，请重新登录");
       logout();
@@ -44,20 +45,14 @@ export default function ChangePassword() {
   };
 
   return (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        minHeight: "100vh",
-        background: "#f0f2f5",
-        padding: 16,
-      }}
-    >
-      <Card style={{ width: "100%", maxWidth: 440 }}>
-        <Typography.Title level={3} style={{ textAlign: "center", marginTop: 0 }}>
-          修改密码
-        </Typography.Title>
+    <div className="auth-page">
+      <div className="auth-card">
+        <div className="auth-brand">
+          <span className="auth-brand__mark">V</span>
+          <h1 className="auth-brand__title">修改密码</h1>
+          <p className="auth-brand__sub">修改后需要使用新密码重新登录</p>
+        </div>
+
         {user?.mustChangePassword && (
           <Alert
             type="warning"
@@ -67,9 +62,10 @@ export default function ChangePassword() {
           />
         )}
         {error && <Alert type="error" showIcon message={error} style={{ marginBottom: 16 }} />}
-        <Form form={form} layout="vertical" onFinish={handleFinish} requiredMark={false}>
+
+        <Form form={form} layout="vertical" onFinish={handleFinish} requiredMark={false} size="large">
           <Form.Item name="oldPassword" label="原密码" rules={[{ required: true, message: "请输入原密码" }]}>
-            <Input.Password prefix={<LockOutlined />} size="large" placeholder="请输入原密码" />
+            <Input.Password prefix={<LockOutlined className="text-muted" />} placeholder="请输入原密码" />
           </Form.Item>
           <Form.Item
             name="newPassword"
@@ -79,7 +75,7 @@ export default function ChangePassword() {
               { min: 6, message: "密码长度不能少于 6 位" },
             ]}
           >
-            <Input.Password prefix={<LockOutlined />} size="large" placeholder="至少 6 位" />
+            <Input.Password prefix={<LockOutlined className="text-muted" />} placeholder="至少 6 位" />
           </Form.Item>
           <Form.Item
             name="confirmPassword"
@@ -95,15 +91,15 @@ export default function ChangePassword() {
               }),
             ]}
           >
-            <Input.Password prefix={<LockOutlined />} size="large" placeholder="请再次输入新密码" />
+            <Input.Password prefix={<LockOutlined className="text-muted" />} placeholder="请再次输入新密码" />
           </Form.Item>
-          <Form.Item style={{ marginBottom: 0 }}>
-            <Button type="primary" htmlType="submit" size="large" block loading={submitting}>
+          <Form.Item style={{ marginBottom: 0, marginTop: 8 }}>
+            <Button type="primary" htmlType="submit" block loading={submitting}>
               确认修改
             </Button>
           </Form.Item>
         </Form>
-      </Card>
+      </div>
     </div>
   );
 }

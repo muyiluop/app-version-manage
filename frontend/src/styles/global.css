@@ -1,0 +1,505 @@
+/**
+ * 全局样式：应用外壳、页面骨架与少量通用类。
+ *
+ * 约定：
+ * - 颜色/圆角/阴影优先走 antd 令牌（见 styles/theme.ts），这里只写令牌覆盖不到的结构性样式；
+ * - 页面统一用 .page / .page__header / .table-toolbar 骨架，避免每个页面各写一套间距。
+ */
+
+:root {
+  --app-layout-bg: #f5f7fa;
+  --app-surface: #ffffff;
+  --app-border: #eef1f5;
+  --app-text: rgba(0, 0, 0, 0.88);
+  --app-text-muted: rgba(0, 0, 0, 0.45);
+  --app-radius: 12px;
+  --app-shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.06);
+  --app-shadow-hover: 0 6px 20px rgba(16, 24, 40, 0.1);
+  --app-transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  color: var(--app-text);
+  background-color: var(--app-layout-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 细滚动条，避免默认滚动条打断浅色界面 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+  background-clip: content-box;
+}
+
+/* ---------- 应用外壳 ---------- */
+
+.app-shell {
+  min-height: 100vh;
+}
+
+.app-sider {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 20;
+  box-shadow: 2px 0 12px rgba(15, 23, 42, 0.08);
+}
+
+.app-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 64px;
+  padding: 0 18px;
+  overflow: hidden;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  white-space: nowrap;
+}
+
+.app-brand__mark {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  font-size: 17px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #1677ff 0%, #4f46e5 100%);
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(22, 119, 255, 0.35);
+}
+
+.app-brand__text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+.app-brand__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+}
+.app-brand__sub {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.app-sider .ant-menu {
+  background: transparent;
+}
+
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 64px;
+  padding: 0 24px;
+  background: var(--app-surface);
+  border-bottom: 1px solid var(--app-border);
+  backdrop-filter: saturate(180%) blur(8px);
+}
+
+.app-header__left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.app-header__toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  color: var(--app-text-muted);
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  transition: background var(--app-transition), color var(--app-transition);
+}
+.app-header__toggle:hover {
+  color: var(--app-text);
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.app-header__user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px 4px 6px;
+  cursor: pointer;
+  border-radius: 999px;
+  transition: background var(--app-transition);
+}
+.app-header__user:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+.app-header__username {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.app-main {
+  /* 关键：flex 子项默认 min-width:auto，会被宽表格撑破视口，
+     设成 0 后表格才会在自身内部出现横向滚动条。 */
+  min-width: 0;
+}
+
+.app-content {
+  padding: 24px;
+}
+
+/* ---------- 页面骨架 ---------- */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.page__header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.page__heading {
+  min-width: 0;
+}
+.page__title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+}
+.page__desc {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--app-text-muted);
+}
+.page__extra {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+/* 白色容器：卡片式页面主体 */
+.surface {
+  padding: 20px 24px;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius);
+  box-shadow: var(--app-shadow);
+}
+
+/* ---------- 表格工具条 ---------- */
+
+.table-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.table-toolbar__left,
+.table-toolbar__right {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.table-toolbar__error {
+  font-size: 13px;
+  color: #ff4d4f;
+}
+
+/* 表格自适应圆角容器 */
+.table-card .ant-table {
+  border-radius: 10px;
+}
+.table-card .ant-table-thead > tr > th {
+  font-weight: 600;
+}
+
+/* ---------- 通用小工具类 ---------- */
+
+.text-muted {
+  color: var(--app-text-muted);
+}
+.text-strong {
+  font-weight: 600;
+}
+.mono {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 13px;
+}
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.app-logo {
+  display: block;
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  background: #fafbfc;
+  border: 1px solid var(--app-border);
+  border-radius: 10px;
+}
+.app-logo--lg {
+  width: 72px;
+  height: 72px;
+  border-radius: 14px;
+}
+
+/* 应用详情头部：窄屏改为纵向堆叠，避免标题被操作按钮挤成一列 */
+.app-info {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+.app-info__logo {
+  flex: 0 0 auto;
+  width: 120px;
+}
+.app-info__body {
+  flex: 1;
+  min-width: 0;
+}
+.app-info__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+  justify-content: space-between;
+}
+.app-info__head .ant-typography {
+  min-width: 0;
+  word-break: break-word;
+}
+
+@media (max-width: 768px) {
+  .app-info {
+    flex-direction: column;
+    gap: 16px;
+  }
+  .app-info__logo {
+    width: 72px;
+  }
+  .app-info__logo .app-logo,
+  .app-info__logo > div {
+    width: 72px !important;
+    height: 72px !important;
+    border-radius: 12px !important;
+  }
+  .app-info__actions {
+    width: 100%;
+  }
+}
+
+/* 统计数字 */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+.stat-card {
+  padding: 16px 18px;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius);
+  box-shadow: var(--app-shadow);
+  transition: box-shadow var(--app-transition), transform var(--app-transition);
+}
+.stat-card:hover {
+  box-shadow: var(--app-shadow-hover);
+  transform: translateY(-1px);
+}
+.stat-card__label {
+  font-size: 12px;
+  color: var(--app-text-muted);
+}
+.stat-card__value {
+  margin-top: 6px;
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+/* ---------- 认证页（登录 / 改密） ---------- */
+
+.auth-page {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 24px;
+  overflow: hidden;
+  background: radial-gradient(circle at 12% 18%, #dbeafe 0%, transparent 45%),
+    radial-gradient(circle at 88% 82%, #e0e7ff 0%, transparent 45%), #f5f7fa;
+}
+
+.auth-card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 420px;
+  padding: 32px;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: 16px;
+  box-shadow: 0 12px 40px rgba(16, 24, 40, 0.1);
+}
+
+.auth-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  text-align: center;
+}
+.auth-brand__mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  font-size: 24px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #1677ff 0%, #4f46e5 100%);
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(22, 119, 255, 0.35);
+}
+.auth-brand__title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.auth-brand__sub {
+  margin: 0;
+  font-size: 13px;
+  color: var(--app-text-muted);
+}
+
+/* ---------- 分享前台 ---------- */
+
+/* 分享页：给 body 挂 share-mode 以获得全宽渐变背景，不影响后台 */
+body.share-mode {
+  background: linear-gradient(180deg, #e9f1ff 0%, #f5f7fa 320px, #f5f7fa 100%);
+}
+
+.share-container {
+  max-width: 900px;
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 32px 16px 48px;
+}
+.share-hero {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  padding: 24px;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: 16px;
+  box-shadow: var(--app-shadow);
+}
+.share-hero__logo {
+  flex: 0 0 auto;
+  width: 88px;
+  height: 88px;
+  object-fit: contain;
+  background: #fafbfc;
+  border: 1px solid var(--app-border);
+  border-radius: 16px;
+}
+.share-hero__title {
+  margin: 0 0 6px;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.share-hero__desc {
+  margin: 0;
+  font-size: 13px;
+  color: var(--app-text-muted);
+}
+.share-section {
+  margin-top: 16px;
+  padding: 20px 24px;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: 16px;
+  box-shadow: var(--app-shadow);
+}
+
+@media (max-width: 768px) {
+  /* 窄屏：面包屑与用户名让位给主要内容，避免顶栏溢出 */
+  .app-header {
+    padding: 0 12px;
+  }
+  .app-header__breadcrumb,
+  .app-header__username {
+    display: none;
+  }
+  .page__extra {
+    width: 100%;
+  }
+  .page__extra > .ant-btn {
+    flex: 1;
+  }
+}
+
+@media (max-width: 640px) {
+  .app-content {
+    padding: 16px;
+  }
+  .surface {
+    padding: 16px;
+  }
+  .auth-card {
+    padding: 24px;
+  }
+  .share-hero {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

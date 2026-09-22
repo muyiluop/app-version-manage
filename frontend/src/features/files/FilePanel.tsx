@@ -9,6 +9,8 @@ import type { TablePaginationConfig } from "antd";
 import * as filesApi from "../../api/files";
 import { useRequest } from "../../hooks/useRequest";
 import { useSubmit } from "../../hooks/useSubmit";
+import PageContainer from "../../components/PageContainer";
+import TableToolbar from "../../components/TableToolbar";
 import { useAuth } from "../auth/AuthContext";
 import type { StoredFile } from "../../types/api";
 import { canWrite } from "../../utils/auth";
@@ -159,37 +161,43 @@ export default function FilePanel() {
   ];
 
   return (
-    <div>
-      <Space style={{ marginBottom: 16 }} wrap>
-        {writable && (
-          <Upload multiple={false} showUploadList={false} customRequest={handleUpload}>
-            <Button type="primary" icon={<UploadOutlined />} loading={uploadPercent !== null}>
-              上传文件
-            </Button>
-          </Upload>
-        )}
-        {writable && (
-          <Popconfirm
-            title="清理未使用文件"
-            description="将删除所有未被版本或应用引用的文件，是否继续？"
-            okText="清理"
-            cancelText="取消"
-            onConfirm={handleClean}
-          >
-            <Button icon={<ClearOutlined />}>清理未使用文件</Button>
-          </Popconfirm>
-        )}
-        <Input.Search
-          allowClear
-          style={{ width: 260 }}
-          placeholder="搜索文件名或对象键"
-          onSearch={(value) => {
-            setKeyword(value.trim());
-            setPage(1);
-          }}
-        />
-        {error && <span style={{ color: "#ff4d4f" }}>{error}</span>}
-      </Space>
+    <PageContainer title="文件管理" description="版本产物与图标等对象文件，支持秒传去重与孤儿清理">
+      <TableToolbar
+        left={
+          <Input.Search
+            allowClear
+            style={{ width: 260 }}
+            placeholder="搜索文件名或对象键"
+            onSearch={(value) => {
+              setKeyword(value.trim());
+              setPage(1);
+            }}
+          />
+        }
+        right={
+          <>
+            {writable && (
+              <Upload multiple={false} showUploadList={false} customRequest={handleUpload}>
+                <Button type="primary" icon={<UploadOutlined />} loading={uploadPercent !== null}>
+                  上传文件
+                </Button>
+              </Upload>
+            )}
+            {writable && (
+              <Popconfirm
+                title="清理未使用文件"
+                description="将删除所有未被版本或应用引用的文件，是否继续？"
+                okText="清理"
+                cancelText="取消"
+                onConfirm={handleClean}
+              >
+                <Button icon={<ClearOutlined />}>清理未使用文件</Button>
+              </Popconfirm>
+            )}
+          </>
+        }
+        error={error}
+      />
 
       {uploadPercent !== null && (
         <Progress percent={uploadPercent} style={{ marginBottom: 16 }} status="active" />
@@ -211,6 +219,6 @@ export default function FilePanel() {
         }}
         onChange={handleTableChange}
       />
-    </div>
+    </PageContainer>
   );
 }

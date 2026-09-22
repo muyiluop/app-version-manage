@@ -2,9 +2,11 @@
  * 审计日志：按 action 过滤 + 分页。
  */
 import { useState } from "react";
-import { Select, Space, Table, Tag, Tooltip } from "antd";
+import { Select, Table, Tag, Tooltip } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import type { TablePaginationConfig } from "antd";
+import PageContainer from "../../components/PageContainer";
+import TableToolbar from "../../components/TableToolbar";
 import * as auditApi from "../../api/audit";
 import { useRequest } from "../../hooks/useRequest";
 import type { AuditLog } from "../../types/api";
@@ -67,22 +69,24 @@ export default function AuditPanel() {
   ];
 
   return (
-    <div>
-      <Space style={{ marginBottom: 16 }} wrap>
-        <Select
-          allowClear
-          showSearch
-          style={{ width: 240 }}
-          placeholder="按动作过滤"
-          value={action}
-          onChange={(value: string | undefined) => {
-            setAction(value);
-            setPage(1);
-          }}
-          options={auditApi.AUDIT_ACTIONS}
-        />
-        {error && <span style={{ color: "#ff4d4f" }}>{error}</span>}
-      </Space>
+    <PageContainer title="审计日志" description="关键操作留痕：谁在什么时候改了什么">
+      <TableToolbar
+        left={
+          <Select
+            allowClear
+            showSearch
+            style={{ width: 240 }}
+            placeholder="按动作过滤"
+            value={action}
+            onChange={(value: string | undefined) => {
+              setAction(value);
+              setPage(1);
+            }}
+            options={auditApi.AUDIT_ACTIONS}
+          />
+        }
+        error={error}
+      />
 
       <Table
         rowKey="id"
@@ -100,6 +104,6 @@ export default function AuditPanel() {
         }}
         onChange={handleTableChange}
       />
-    </div>
+    </PageContainer>
   );
 }

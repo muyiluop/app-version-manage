@@ -1,11 +1,14 @@
 /**
- * 后台主框架：侧边菜单 + 面包屑 + 内容区。
+ * 后台主框架：深色侧边导航 + 顶部栏 + 内容区。
  *
- * 菜单选中项由 pathname 派生（不再直接用 pathname 作为 key），
- * 否则 /apps/1 这类子路由不会高亮任何一项。
+ * 设计要点：
+ * - 侧栏固定定位并支持折叠（状态记在 localStorage，刷新后保持）；
+ * - 菜单选中项由 pathname 派生（不能直接用 pathname 作 key，否则 /apps/1 不会高亮）；
+ * - 顶部栏 sticky，承载折叠按钮、面包屑与用户菜单；
+ * - 颜色与圆角全部来自样式令牌，组件内不再写死颜色。
  */
-import { useMemo, type ReactNode } from "react";
-import { Avatar, Breadcrumb, Dropdown, Layout as AntLayout, Menu, Space, Tag, type MenuProps } from "antd";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Avatar, Breadcrumb, Dropdown, Layout as AntLayout, Menu, Tag, Tooltip, type MenuProps } from "antd";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   AppstoreOutlined,
@@ -13,6 +16,8 @@ import {
   FolderOutlined,
   KeyOutlined,
   LogoutOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
   TeamOutlined,
   UserOutlined,
 } from "@ant-design/icons";
@@ -21,6 +26,8 @@ import { useAuth } from "../features/auth/AuthContext";
 import { isAdmin, roleLabel } from "../utils/auth";
 
 const { Header, Content, Sider } = AntLayout;
+
+const COLLAPSE_KEY = "avm_sider_collapsed";
 
 interface MenuEntry {
   key: string;
@@ -45,14 +52,16 @@ function resolveMenuKey(pathname: string): string {
   return matched ?? "/apps";
 }
 
-/** 面包屑：固定两项足够覆盖当前路由层级。 */
+/** 面包屑：一级菜单名 + 二级语义化名称。 */
 function resolveBreadcrumb(pathname: string): string[] {
   const segments = pathname.split("/").filter(Boolean);
   if (segments.length === 0) return [];
   const root = resolveMenuKey(pathname);
   const rootLabel = MENU_ENTRIES.find((entry) => entry.key === root)?.label ?? "";
   if (segments.length === 1) return [rootLabel];
-  if (root === "/apps") return [rootLabel, "应用详情"];
+  if (root === "/apps") {
+    return [rootLabel, segments[0] === "apps" ? "应用详情" : segments[1]];
+  }
   return [rootLabel];
 }
 
@@ -60,6 +69,14 @@ const Layout = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
+
+  const [collapsed, setCollapsed] = useState<boolean>(
+    () => localStorage.getItem(COLLAPSE_KEY) === "1"
+  );
+
+  useEffect(() => {
+    localStorage.setItem(COLLAPSE_KEY, collapsed ? "1" : "0");
+  }, [collapsed]);
 
   const menuItems = useMemo<MenuProps["items"]>(
     () =>
@@ -93,50 +110,72 @@ const Layout = () => {
     },
   };
 
+  const siderWidth = collapsed ? 72 : 240;
+
   return (
-    <AntLayout style={{ minHeight: "100vh" }}>
-      <Header
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "0 24px",
-          background: "#fff",
-          borderBottom: "1px solid #f0f0f0",
-        }}
+    <AntLayout className="app-shell">
+      <Sider
+        className="app-sider"
+        theme="dark"
+        width={240}
+        collapsedWidth={72}
+        collapsed={collapsed}
+        breakpoint="lg"
+        onBreakpoint={(broken) => setCollapsed(broken)}
+        trigger={null}
       >
-        <div style={{ fontSize: 18, fontWeight: 600 }}>软件版本管理系统</div>
-        <Dropdown menu={userMenu} placement="bottomRight">
-          <Space style={{ cursor: "pointer" }}>
-            <Avatar size="small" icon={<UserOutlined />} />
-            <span>{user?.displayName || user?.username || "未登录"}</span>
-            {user && <Tag color="blue">{roleLabel(user.role)}</Tag>}
-          </Space>
-        </Dropdown>
-      </Header>
-      <AntLayout hasSider>
-        <Sider
-          width={200}
-          style={{ background: "#fff", overflow: "auto", height: "calc(100vh - 64px)", position: "fixed", left: 0 }}
-        >
-          <Menu
-            mode="inline"
-            selectedKeys={[selectedKey]}
-            style={{ height: "100%", borderRight: 0 }}
-            items={menuItems}
-            onClick={({ key }) => navigate(key)}
-          />
-        </Sider>
-        <AntLayout style={{ marginLeft: 200 }}>
-          <Content style={{ margin: 24 }}>
-            <Breadcrumb items={breadcrumbItems} style={{ marginBottom: 16 }} />
-            <div style={{ background: "#fff", padding: 24, minHeight: 280, borderRadius: 8 }}>
-              <ErrorBoundary>
-                <Outlet />
-              </ErrorBoundary>
-            </div>
-          </Content>
-        </AntLayout>
+        <div className="app-brand">
+          <span className="app-brand__mark">V</span>
+          {!collapsed && (
+            <span className="app-brand__text">
+              <span className="app-brand__title">版本发布系统</span>
+              <span className="app-brand__sub">App Version Manage</span>
+            </span>
+          )}
+        </div>
+        <Menu
+          theme="dark"
+          mode="inline"
+          selectedKeys={[selectedKey]}
+          items={menuItems}
+          onClick={({ key }) => navigate(key)}
+        />
+      </Sider>
+
+      <AntLayout className="app-main" style={{ marginLeft: siderWidth, transition: "margin-left 0.2s" }}>
+        <Header className="app-header">
+          <div className="app-header__left">
+            <Tooltip title={collapsed ? "展开菜单" : "收起菜单"}>
+              <button
+                type="button"
+                className="app-header__toggle"
+                aria-label={collapsed ? "展开菜单" : "收起菜单"}
+                onClick={() => setCollapsed((value) => !value)}
+              >
+                {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+              </button>
+            </Tooltip>
+            <Breadcrumb className="app-header__breadcrumb" items={breadcrumbItems} />
+          </div>
+
+          <div className="app-header__left">
+            <Dropdown menu={userMenu} placement="bottomRight" trigger={["click"]}>
+              <div className="app-header__user">
+                <Avatar size={28} style={{ background: "#1677ff" }} icon={<UserOutlined />} />
+                <span className="app-header__username">
+                  {user?.displayName || user?.username || "未登录"}
+                </span>
+                {user && <Tag color="blue" style={{ marginInlineEnd: 0 }}>{roleLabel(user.role)}</Tag>}
+              </div>
+            </Dropdown>
+          </div>
+        </Header>
+
+        <Content className="app-content">
+          <ErrorBoundary>
+            <Outlet />
+          </ErrorBoundary>
+        </Content>
       </AntLayout>
     </AntLayout>
   );

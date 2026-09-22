@@ -82,6 +82,12 @@ export default function SharePortal() {
     [payload?.currentPlatform, fallbackPlatform]
   );
 
+  // 分享页是公开入口，单独给 body 加一层渐变背景（退出时清理）
+  useEffect(() => {
+    document.body.classList.add("share-mode");
+    return () => document.body.classList.remove("share-mode");
+  }, []);
+
   // 访问分享：attempt 变化触发重试，避免用同一个密码重复请求时被依赖去重挡住
   useEffect(() => {
     if (!token) {
@@ -146,7 +152,7 @@ export default function SharePortal() {
 
   if (stage === "loading") {
     return (
-      <div style={{ maxWidth: 900, margin: "0 auto", padding: deviceType === "mobile" ? 16 : 24 }}>
+      <div className="share-container">
         <Card>
           <Skeleton active avatar paragraph={{ rows: 4 }} />
         </Card>
@@ -199,17 +205,13 @@ export default function SharePortal() {
   );
 
   return (
-    <div style={{ maxWidth: 900, margin: "0 auto", padding: deviceType === "mobile" ? 16 : 24 }}>
-      <Card>
-        <div style={{ display: "flex", gap: 24, alignItems: "flex-start" }}>
+    <div className="share-container">
+      <Card className="share-hero">
+        <div style={{ display: "flex", gap: 24, alignItems: "center", flexWrap: "wrap" }}>
           {payload.app.logo && (
-            <img
-              src={logoUrl(payload.app.logo)}
-              alt={`${payload.app.name} 图标`}
-              style={{ width: 96, height: 96, objectFit: "contain", borderRadius: 8, background: "#fafafa" }}
-            />
+            <img className="share-hero__logo" src={logoUrl(payload.app.logo)} alt={`${payload.app.name} 图标`} />
           )}
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: 1, minWidth: 220 }}>
             <Title level={2} style={{ marginTop: 0, marginBottom: 8 }}>
               {payload.app.name}
             </Title>

@@ -1,5 +1,5 @@
 import { Navigate, Route, Routes, BrowserRouter } from "react-router-dom";
-import { App as AntApp, ConfigProvider, theme } from "antd";
+import { App as AntApp, ConfigProvider } from "antd";
 import zhCN from "antd/locale/zh_CN";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import Layout from "./components/Layout";
@@ -14,6 +14,7 @@ import Users from "./pages/Users";
 import Audit from "./pages/Audit";
 import NotFound from "./pages/NotFound";
 import SharePortal from "./features/share-portal/SharePortal";
+import { appTheme } from "./styles/theme";
 
 // 默认不重试、不自动聚焦刷新：列表类页面更适合显式 refresh
 const queryClient = new QueryClient({
@@ -24,13 +25,7 @@ const queryClient = new QueryClient({
 
 const App = () => {
   return (
-    <ConfigProvider
-      locale={zhCN}
-      theme={{
-        algorithm: theme.defaultAlgorithm,
-        token: { colorPrimary: "#1677ff" },
-      }}
-    >
+    <ConfigProvider locale={zhCN} theme={appTheme}>
       <AntApp>
         <QueryClientProvider client={queryClient}>
           <BrowserRouter>

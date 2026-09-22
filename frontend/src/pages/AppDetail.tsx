@@ -8,6 +8,7 @@ import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { Card, Result, Skeleton, Tabs, type TabsProps } from "antd";
 import AppInfoCard from "../features/apps/AppInfoCard";
+import PageContainer from "../components/PageContainer";
 import ChannelPanel from "../features/channels/ChannelPanel";
 import VersionPanel from "../features/versions/VersionPanel";
 import SharePanel from "../features/shares/SharePanel";
@@ -68,11 +69,11 @@ export default function AppDetail() {
   ];
 
   return (
-    <div>
+    <PageContainer surface={false}>
       <AppInfoCard app={app} onChanged={appQuery.refresh} />
-      <div style={{ marginTop: 24 }}>
+      <div className="surface">
         <Tabs items={items} activeKey={activeKey} onChange={setActiveKey} />
       </div>
-    </div>
+    </PageContainer>
   );
 }

@@ -34,37 +34,39 @@ export default function AppInfoCard({ app, onChanged }: Props) {
 
   return (
     <Card>
-      <div style={{ display: "flex", gap: 24, alignItems: "flex-start" }}>
-        <div style={{ width: 120, flexShrink: 0 }}>
+      <div className="app-info">
+        <div className="app-info__logo">
           {app.logo ? (
             <img
+              className="app-logo"
               src={logoUrl(app.logo)}
               alt="应用图标"
-              style={{ width: 120, height: 120, objectFit: "contain", borderRadius: 8, background: "#fafafa" }}
+              style={{ width: 120, height: 120, borderRadius: 16 }}
             />
           ) : (
             <div
               style={{
                 width: 120,
                 height: 120,
-                borderRadius: 8,
-                background: "#fafafa",
+                borderRadius: 16,
+                background: "var(--app-layout-bg)",
+                border: "1px dashed var(--app-border)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                color: "#bfbfbf",
+                color: "var(--app-text-muted)",
               }}
             >
               无图标
             </div>
           )}
         </div>
-        <div style={{ flex: 1 }}>
-          <Space style={{ width: "100%", justifyContent: "space-between", alignItems: "flex-start" }}>
-            <Typography.Title level={3} style={{ margin: 0 }}>
+        <div className="app-info__body">
+          <div className="app-info__head">
+            <Typography.Title level={3} style={{ margin: 0, minWidth: 0 }}>
               {app.name}
             </Typography.Title>
-            <Space>
+            <Space className="app-info__actions">
               {canWrite(user?.role) && (
                 <Button type="primary" icon={<EditOutlined />} onClick={() => setEditOpen(true)}>
                   编辑应用
@@ -85,7 +87,7 @@ export default function AppInfoCard({ app, onChanged }: Props) {
                 </Popconfirm>
               )}
             </Space>
-          </Space>
+          </div>
           <Descriptions column={{ xs: 1, sm: 2 }} size="small" style={{ marginTop: 16 }}>
             <Descriptions.Item label="应用标识">{app.identifier}</Descriptions.Item>
             <Descriptions.Item label="默认通道">

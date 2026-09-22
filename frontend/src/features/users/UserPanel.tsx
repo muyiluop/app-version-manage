@@ -7,6 +7,8 @@ import { DeleteOutlined, EditOutlined, PlusOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 import type { TablePaginationConfig } from "antd";
 import UserFormModal from "./UserFormModal";
+import PageContainer from "../../components/PageContainer";
+import TableToolbar from "../../components/TableToolbar";
 import * as usersApi from "../../api/users";
 import { useRequest } from "../../hooks/useRequest";
 import { useSubmit } from "../../hooks/useSubmit";
@@ -107,20 +109,22 @@ export default function UserPanel() {
   ];
 
   return (
-    <div>
-      <div style={{ marginBottom: 16, display: "flex", justifyContent: "space-between" }}>
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          onClick={() => {
-            setEditing(null);
-            setModalOpen(true);
-          }}
-        >
-          创建用户
-        </Button>
-        {error && <span style={{ color: "#ff4d4f" }}>{error}</span>}
-      </div>
+    <PageContainer title="用户管理" description="账号、角色与状态；重置密码后该用户下次登录需改密">
+      <TableToolbar
+        right={
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => {
+              setEditing(null);
+              setModalOpen(true);
+            }}
+          >
+            创建用户
+          </Button>
+        }
+        error={error}
+      />
 
       <Table
         rowKey="id"
@@ -151,6 +155,6 @@ export default function UserPanel() {
           refresh();
         }}
       />
-    </div>
+    </PageContainer>
   );
 }

@@ -85,7 +85,8 @@ export default function VersionPanel({ app, channels }: Props) {
       title: "版本号",
       dataIndex: "version",
       key: "version",
-      render: (value: string) => <span style={{ fontWeight: 500 }}>{value}</span>,
+      // 版本号是识别主键，固定不换行，避免列被挤压时折成两行
+      render: (value: string) => <span className="mono" style={{ fontWeight: 500, whiteSpace: "nowrap" }}>{value}</span>,
     },
     {
       title: "平台",
@@ -120,12 +121,16 @@ export default function VersionPanel({ app, channels }: Props) {
       title: "发布时间",
       dataIndex: "publishedAt",
       key: "publishedAt",
-      render: (value: string | null, record) => formatDateTime(value ?? record.createdAt),
+      width: 180,
+      render: (value: string | null, record) => (
+        <span style={{ whiteSpace: "nowrap" }}>{formatDateTime(value ?? record.createdAt)}</span>
+      ),
     },
     {
       title: "操作",
       key: "action",
-      width: 260,
+      // 四个带图标的操作按钮需要约 280px，窄了会被裁掉
+      width: 300,
       fixed: "right",
       render: (_, record) => (
         <Space size={0}>
@@ -251,7 +256,7 @@ export default function VersionPanel({ app, channels }: Props) {
         columns={columns}
         dataSource={rows}
         loading={loading}
-        scroll={{ x: 1100 }}
+        scroll={{ x: 1200 }}
         locale={{ emptyText: "暂无版本数据" }}
         pagination={{
           current: data?.page ?? page,

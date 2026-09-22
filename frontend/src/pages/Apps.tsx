@@ -8,6 +8,8 @@ import type { ColumnsType } from "antd/es/table";
 import type { TablePaginationConfig } from "antd";
 import { useNavigate } from "react-router-dom";
 import AppFormModal from "../features/apps/AppFormModal";
+import PageContainer from "../components/PageContainer";
+import TableToolbar from "../components/TableToolbar";
 import * as appsApi from "../api/apps";
 import { useRequest } from "../hooks/useRequest";
 import { useSubmit } from "../hooks/useSubmit";
@@ -48,12 +50,7 @@ export default function Apps() {
       dataIndex: "logo",
       key: "logo",
       width: 80,
-      render: (value: string) =>
-        value ? (
-          <img src={logoUrl(value)} alt="应用图标" style={{ width: 40, height: 40, objectFit: "contain" }} />
-        ) : (
-          "-"
-        ),
+      render: (value: string) => (value ? <img className="app-logo" src={logoUrl(value)} alt="应用图标" /> : "-"),
     },
     {
       title: "应用名称",
@@ -67,18 +64,18 @@ export default function Apps() {
       title: "应用标识",
       dataIndex: "identifier",
       key: "identifier",
-      render: (value: string) => <span style={{ fontFamily: "monospace" }}>{value}</span>,
+      render: (value: string) => <span className="mono">{value}</span>,
     },
     {
       title: "支持平台",
       dataIndex: "platforms",
       key: "platforms",
       render: (value: Platform[]) => (
-        <Space wrap size={4}>
+        <span className="tag-list">
           {value.map((platform) => (
             <Tag key={platform}>{platformLabel(platform)}</Tag>
           ))}
-        </Space>
+        </span>
       ),
     },
     {
@@ -124,24 +121,31 @@ export default function Apps() {
   ];
 
   return (
-    <div>
-      <Space style={{ marginBottom: 16 }} wrap>
-        {canWrite(user?.role) && (
+    <PageContainer
+      title="应用管理"
+      description="维护应用、支持平台与默认发布通道"
+      extra={
+        canWrite(user?.role) && (
           <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
             创建应用
           </Button>
-        )}
-        <Input.Search
-          allowClear
-          style={{ width: 260 }}
-          placeholder="搜索应用名称或标识"
-          onSearch={(value) => {
-            setKeyword(value.trim());
-            setPage(1);
-          }}
-        />
-        {error && <span style={{ color: "#ff4d4f" }}>{error}</span>}
-      </Space>
+        )
+      }
+    >
+      <TableToolbar
+        left={
+          <Input.Search
+            allowClear
+            style={{ width: 260 }}
+            placeholder="搜索应用名称或标识"
+            onSearch={(value) => {
+              setKeyword(value.trim());
+              setPage(1);
+            }}
+          />
+        }
+        error={error}
+      />
 
       <Table
         rowKey="id"
@@ -169,6 +173,6 @@ export default function Apps() {
           refresh();
         }}
       />
-    </div>
+    </PageContainer>
   );
 }
