@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/url"
 	"strings"
 	"time"
 
@@ -187,16 +186,16 @@ func (s *s3Storage) PresignGet(ctx context.Context, key, filename string, ttl ti
 		ttl = s.urlTTL
 	}
 
-	params := url.Values{}
-	if filename != "" {
-		params.Set("response-content-disposition",
-			fmt.Sprintf("attachment; filename*=UTF-8''%s", url.PathEscape(filename)))
-	}
+	// filename 必须与其它参数一起签名，再把它排到查询串最后：
+	// 该参数的值就是文件名，末端天然带扩展名；而直接在生成的地址末尾拼接未签名
+	// 参数会因 SigV4 校验整个查询串而 403。
+	params := presignParams(filename)
 
 	u, err := s.presign.PresignedGetObject(ctx, s.bucket, name, ttl, params)
 	if err != nil {
 		return "", fmt.Errorf("生成预签名地址失败: %w", err)
 	}
+	moveParamLast(u, "filename")
 	return u.String(), nil
 }
 

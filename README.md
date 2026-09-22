@@ -192,6 +192,13 @@ docker compose --profile s3 up -d --build         # 使用 MinIO
 配置后会**同时影响图片与文件下载**（二者共用同一条解析逻辑 `OpenDownload`）：
 
 - 预签名地址已带上 `response-content-disposition`，下载文件名不会变；
+- **URL 末尾固定以 `filename=<文件名>` 收尾**（排在 `X-Amz-Signature` 之后）。这是为了
+  照顾那些「从 URL 文本截取扩展名」来判断文件类型的客户端：不加这个参数时，URL 里
+  最后一个点落在 `response-content-disposition` 的文件名上，其后还拖着签名等字符，
+  截出来是乱码。带上它之后，取「最后一个点之后」即可稳定得到 `apk`、`exe` 等后缀。
+  **不要在下发地址末尾自行追加参数** —— SigV4 会校验整个查询串，追加未签名参数会直接
+  403；该参数是签名的一部分，只是显示顺序被移到了末尾（SigV4 校验按参数名排序的集合，
+  与顺序无关，已实测重排后仍可正常下载）；
 - 下载计数在跳转前就已记录，统计不受影响；
 - 前端"下载版本"走的是 XHR（axios blob），跳转到**跨域**的 MinIO 需要 CORS。
   实测 MinIO 的预签名 GET 默认返回 `Access-Control-Allow-Origin` 与完整的

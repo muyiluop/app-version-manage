@@ -9,6 +9,52 @@ import (
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
+// presignParams 组装预签名查询参数。
+//
+// 两个参数都带文件名，但用途不同：
+//   - response-content-disposition：浏览器另存为时使用的文件名（S3 语义）；
+//   - filename：把文件名原样再放一份，并排到查询串**最后**（见 moveParamLast）。
+//
+// 为什么要后者：不少客户端直接从 URL 文本截取扩展名判断文件类型，而 disposition 的
+// 值里既有前缀 attachment; filename*=UTF-8” 又有百分号编码，最后一个点之后常常拖着一串
+// 垃圾字符。让「以文件名为值的参数」收尾，URL 末尾天然就是 .apk 这样的完整后缀，
+// 客户端取最后一个点之后即可，无需再解析任何前缀。
+func presignParams(filename string) url.Values {
+	params := url.Values{}
+	if filename == "" {
+		return params
+	}
+	params.Set("response-content-disposition",
+		fmt.Sprintf("attachment; filename*=UTF-8''%s", url.PathEscape(filename)))
+	params.Set("filename", filename)
+	return params
+}
+
+// moveParamLast 把指定查询参数移动到查询串末尾。
+//
+// 为什么可以重排：SigV4 的校验基于「按参数名排序后的集合」，与参数在 URL 中的先后
+// 顺序无关，因此重排不会破坏签名；但在下发之后再拼接**未签名**的参数会直接被拒（403）。
+// 这里直接操作 RawQuery，保留原始编码，避免二次编码造成签名不一致。
+func moveParamLast(u *url.URL, name string) {
+	if u == nil || u.RawQuery == "" || name == "" {
+		return
+	}
+	parts := strings.Split(u.RawQuery, "&")
+	keep := make([]string, 0, len(parts))
+	moved := make([]string, 0, 1)
+	for _, p := range parts {
+		if strings.HasPrefix(p, name+"=") {
+			moved = append(moved, p)
+			continue
+		}
+		keep = append(keep, p)
+	}
+	if len(moved) == 0 {
+		return
+	}
+	u.RawQuery = strings.Join(append(keep, moved...), "&")
+}
+
 // parsePublicEndpoint 解析「对外访问地址」，返回 minio 需要的 endpoint 与是否启用 TLS。
 //
 // 只接受形如 https://files.example.com[:port] 的地址：
