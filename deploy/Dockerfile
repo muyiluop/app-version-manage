@@ -43,7 +43,8 @@ COPY --from=backend-builder /out/appv /app/appv
 COPY --from=backend-builder /out/appv-migrate /app/appv-migrate
 COPY deploy/nginx.conf /etc/nginx/conf.d/default.conf
 COPY deploy/entrypoint.sh /docker-entrypoint.sh
-COPY deploy/config.yaml /app/config.yaml
+# 使用不含密钥的模板；真实密钥通过 APPV_* 环境变量在运行时注入
+COPY deploy/config.example.yaml /app/config.yaml
 
 RUN chmod +x /app/appv /app/appv-migrate /docker-entrypoint.sh && mkdir -p /data/uploads
 

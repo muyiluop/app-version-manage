@@ -175,8 +175,8 @@ storage:
 # 日志
 # -----------------------------------------------------------------------------
 log:
-  level: info            # debug | info | warn | error
-  format: text           # text | json（容器/采集环境建议 json）
+  level: info # debug | info | warn | error
+  format: text # text | json（容器/采集环境建议 json）
 
 # -----------------------------------------------------------------------------
 # 上传限制

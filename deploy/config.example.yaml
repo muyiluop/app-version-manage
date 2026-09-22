@@ -1,0 +1,32 @@
+# 容器内默认配置模板。
+#
+# 说明：
+#   · 真实配置文件 deploy/config.yaml 已被 .gitignore 忽略，**不要把它提交进仓库**；
+#     需要本地覆盖时复制一份即可：cp deploy/config.example.yaml deploy/config.yaml
+#   · 镜像构建使用本文件作为 /app/config.yaml（见 deploy/Dockerfile）；
+#   · 密钥一律通过 APPV_* 环境变量注入（优先级高于本文件），
+#     缺失时生产模式会拒绝启动，entrypoint.sh 也会给出提示。
+#   · 首次启动会自动建表：SQLite 文件会自动创建；若改用 PostgreSQL/MySQL，
+#     数据库本身需先手工创建（表会自动建）。
+server:
+  port: 9080
+  mode: release
+
+database:
+  # 也可改为 postgres / mysql，并通过 APPV_DATABASE_DSN 提供连接串
+  driver: sqlite
+  path: /data/app_version.db
+
+storage:
+  # 也可改为 s3（MinIO / AWS S3），并通过 APPV_STORAGE_S3_* 注入连接参数
+  driver: local
+  local:
+    root: /data/uploads
+  signedUrlTtlMinutes: 30
+
+log:
+  level: info
+  format: json
+
+upload:
+  maxSizeMB: 4096

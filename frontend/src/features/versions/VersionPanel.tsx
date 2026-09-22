@@ -14,6 +14,7 @@ import { useSubmit } from "../../hooks/useSubmit";
 import { useAuth } from "../auth/AuthContext";
 import type { Application, Channel, Platform, Version, VersionStatus } from "../../types/api";
 import { VERSION_STATUS_OPTIONS, formatBytes, formatDateTime, platformLabel, versionStatusMeta } from "../../utils/format";
+import { horizontalScroll } from "../../utils/table";
 import { canWrite } from "../../utils/auth";
 import { showMessage } from "../../utils/message";
 
@@ -256,7 +257,7 @@ export default function VersionPanel({ app, channels }: Props) {
         columns={columns}
         dataSource={rows}
         loading={loading}
-        scroll={{ x: 1200 }}
+        scroll={horizontalScroll(1200, rows)}
         locale={{ emptyText: "暂无版本数据" }}
         pagination={{
           current: data?.page ?? page,

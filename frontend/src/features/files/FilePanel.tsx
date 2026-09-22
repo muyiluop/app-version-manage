@@ -16,6 +16,7 @@ import type { StoredFile } from "../../types/api";
 import { canWrite } from "../../utils/auth";
 import { saveBlob } from "../../utils/download";
 import { formatBytes, formatDateTime } from "../../utils/format";
+import { horizontalScroll } from "../../utils/table";
 import { showMessage } from "../../utils/message";
 
 export default function FilePanel() {
@@ -208,7 +209,7 @@ export default function FilePanel() {
         columns={columns}
         dataSource={data?.list ?? []}
         loading={loading}
-        scroll={{ x: 1100 }}
+        scroll={horizontalScroll(1100, data?.list)}
         locale={{ emptyText: "暂无文件" }}
         pagination={{
           current: data?.page ?? page,

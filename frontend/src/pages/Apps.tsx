@@ -17,6 +17,7 @@ import { useAuth } from "../features/auth/AuthContext";
 import type { Application, Platform } from "../types/api";
 import { canWrite, isAdmin } from "../utils/auth";
 import { formatDateTime, logoUrl, platformLabel } from "../utils/format";
+import { horizontalScroll } from "../utils/table";
 import { showMessage } from "../utils/message";
 
 export default function Apps() {
@@ -152,7 +153,7 @@ export default function Apps() {
         columns={columns}
         dataSource={data?.list ?? []}
         loading={loading}
-        scroll={{ x: 1000 }}
+        scroll={horizontalScroll(1000, data?.list)}
         locale={{ emptyText: "暂无应用" }}
         pagination={{
           current: data?.page ?? page,

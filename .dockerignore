@@ -28,6 +28,10 @@ backups/
 .env
 .env.*
 
+# 真实配置文件（含数据库连接串与密钥），镜像内只使用 config.example.yaml 模板
+backend/config.yaml
+deploy/config.yaml
+
 # IDE 配置
 .vscode/
 .idea/

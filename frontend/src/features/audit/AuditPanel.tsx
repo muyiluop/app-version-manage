@@ -11,6 +11,7 @@ import * as auditApi from "../../api/audit";
 import { useRequest } from "../../hooks/useRequest";
 import type { AuditLog } from "../../types/api";
 import { formatDateTime } from "../../utils/format";
+import { horizontalScroll } from "../../utils/table";
 
 export default function AuditPanel() {
   const [action, setAction] = useState<string | undefined>();
@@ -93,7 +94,7 @@ export default function AuditPanel() {
         columns={columns}
         dataSource={data?.list ?? []}
         loading={loading}
-        scroll={{ x: 1100 }}
+        scroll={horizontalScroll(1100, data?.list)}
         locale={{ emptyText: "暂无审计日志" }}
         pagination={{
           current: data?.page ?? page,
