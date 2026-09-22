@@ -1,0 +1,195 @@
+# =============================================================================
+# 版本发布系统 · 全量配置示例
+#
+# 用法：复制为同目录下的 config.yaml 再按需修改
+#     cp config.example.yaml config.yaml
+#
+# 优先级：代码默认值  <  本配置文件  <  APPV_* 环境变量
+#   · 生产环境建议只在本文件写非敏感项，密钥一律走环境变量；
+#   · 启动时会校验：取值非法或生产模式缺密钥会直接拒绝启动并说明原因；
+#   · 完整环境变量清单见仓库根目录 .env.example。
+#
+# 【首次启动会自动建表】
+#   · SQLite：数据库文件与父目录会自动创建，表/索引/初始管理员一并建好；
+#   · PostgreSQL / MySQL：**数据库本身需要你先手工创建**（见下方各示例），
+#     但库里的表、索引、默认通道、初始管理员都会自动创建；
+#   · 迁移是「只增不改」：只新增表、列、索引，不重建表、不删数据，可安全回滚旧版本；
+#   · 关掉自动建表用 database.autoMigrate: false（适合由 DBA 预建表或只读副本）：
+#     此时建表与「初始管理员创建」都不做，只读副本也不会被写入；
+#     若库里还没有表，启动会直接报错并提示你先执行一次显式迁移：
+#         ./appv -config config.yaml -migrate-only
+#     （-migrate-only 是运维的显式动作，不受 autoMigrate 开关影响）
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 服务
+# -----------------------------------------------------------------------------
+server:
+  port: 9080
+  # debug | release
+  # release 会：关闭 gin 调试输出、要求 JWT 与下载签名密钥显式提供且长度 >= 16
+  mode: debug
+  # 对外访问地址，用于拼接绝对链接；留空则返回相对路径
+  baseUrl: ""
+  # 反向代理信任列表：只有来自这些地址的 X-Forwarded-For 才会被采信。
+  # 置空（或写 none）表示不信任任何代理，ClientIP 直接取 RemoteAddr；
+  # "*" 表示信任全部（仅当外层已有可信网关时使用），否则限流可被伪造头绕过。
+  trustedProxies:
+    - 127.0.0.1
+    - "::1"
+
+# -----------------------------------------------------------------------------
+# 数据库
+#   driver: sqlite（默认） | postgres | mysql
+#   · sqlite   用 path
+#   · postgres 用 dsn，形如 host=... 或 postgres://...
+#   · mysql    用 dsn，形如 user:pass@tcp(host:port)/db?...
+# -----------------------------------------------------------------------------
+database:
+  driver: sqlite
+  path: ./data/app_version.db
+  dsn: ""
+  maxOpenConns: 20
+  maxIdleConns: 5
+  # 启动时自动补齐表结构与初始管理员（默认 true）；
+  # 设为 false 则两者都跳过，需先自行执行 -migrate-only。
+  autoMigrate: true
+  # 打印 SQL（排查问题时开启，生产建议关闭）
+  logSql: false
+
+# --- 示例 A：PostgreSQL -------------------------------------------------------
+# 前置：CREATE DATABASE appv;
+# database:
+#   driver: postgres
+#   # 关键字形式（推荐，含时区，避免时间字段出现偏差）
+#   dsn: "host=127.0.0.1 port=5432 user=appv password=你的密码 dbname=appv sslmode=disable TimeZone=Asia/Shanghai"
+#   # 或 URL 形式：
+#   # dsn: "postgres://appv:你的密码@127.0.0.1:5432/appv?sslmode=disable"
+#   maxOpenConns: 20
+#   maxIdleConns: 5
+#   autoMigrate: true
+#   logSql: false
+# 环境变量等价写法：
+#   APPV_DATABASE_DRIVER=postgres
+#   APPV_DATABASE_DSN='host=... user=appv password=*** dbname=appv port=5432 sslmode=disable'
+
+# --- 示例 B：MySQL / MariaDB --------------------------------------------------
+# 前置：CREATE DATABASE appv CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+#   注意 charset=utf8mb4 与 parseTime=True 必须带上，否则中文与时间会出问题。
+# database:
+#   driver: mysql
+#   dsn: "appv:你的密码@tcp(127.0.0.1:3306)/appv?charset=utf8mb4&parseTime=True&loc=Local"
+#   maxOpenConns: 20
+#   maxIdleConns: 5
+#   autoMigrate: true
+#   logSql: false
+# 环境变量等价写法：
+#   APPV_DATABASE_DRIVER=mysql
+#   APPV_DATABASE_DSN='appv:***@tcp(127.0.0.1:3306)/appv?charset=utf8mb4&parseTime=True&loc=Local'
+
+# -----------------------------------------------------------------------------
+# 令牌（JWT）
+#   secret 在生产模式必须显式提供且长度 >= 16；生成：openssl rand -hex 32
+# -----------------------------------------------------------------------------
+jwt:
+  secret: ""
+  expireHours: 24
+  refreshDays: 7
+  issuer: app-version-manage
+
+# -----------------------------------------------------------------------------
+# 安全
+#   · downloadTokenKey：下载签名密钥（HMAC），生产必填，建议独立于 JWT 密钥
+#   · sharePasswordPepper：分享密码哈希的 pepper（可留空）
+#   · adminInitialPassword：仅首次启动创建管理员时使用；留空则随机生成并打印在启动日志
+#   · 限流按「每分钟」计，0 表示关闭该项限流
+# -----------------------------------------------------------------------------
+security:
+  downloadTokenKey: ""
+  sharePasswordPepper: ""
+  adminUsername: admin
+  adminInitialPassword: ""
+  rateLimitLoginPerMin: 10
+  rateLimitSharePerMin: 20
+  rateLimitOpenPerMin: 600
+
+# -----------------------------------------------------------------------------
+# 存储
+#   driver: local（默认） | s3（MinIO / AWS S3 / 阿里云 OSS 等 S3 兼容实现）
+#   · local：文件落在本地磁盘，下载走后端流式代理
+#   · s3   ：下载返回预签名地址，浏览器直连对象存储（省后端带宽）
+# -----------------------------------------------------------------------------
+storage:
+  driver: local
+  # 兼容旧配置：等价于 local.root（两者都写时以 local.root 为准）
+  path: ./static/uploads
+  local:
+    root: ./static/uploads
+  # 预签名下载地址有效期（分钟），仅 s3 有效
+  signedUrlTtlMinutes: 30
+  s3:
+    endpoint: ""
+    region: us-east-1
+    bucket: ""
+    accessKey: ""
+    secretKey: ""
+    # 是否用 HTTPS 访问（自建 MinIO 若未配 TLS 保持 false）
+    useSsl: false
+    # path-style：自建 MinIO 通常 true；AWS S3 或带虚主机名的网关必须 false
+    forcePathStyle: true
+    # 对象键前缀，所有文件都会落在 <prefix>/ 下（便于与其他业务共用一个 bucket）
+    prefix: appv
+
+# --- 示例 C：MinIO（自建，path-style + 明文 HTTP） ----------------------------
+# storage:
+#   driver: s3
+#   s3:
+#     endpoint: minio.example.com:9000
+#     region: us-east-1
+#     bucket: appv
+#     accessKey: minioadmin
+#     secretKey: 你的密码
+#     useSsl: false
+#     forcePathStyle: true
+#     prefix: appv
+#   signedUrlTtlMinutes: 30
+
+# --- 示例 D：AWS S3（必须 forcePathStyle: false + useSsl: true） --------------
+# storage:
+#   driver: s3
+#   s3:
+#     endpoint: s3.ap-east-1.amazonaws.com     # 也可留空由 region 推导
+#     region: ap-east-1                        # 必须与 bucket 所在区域一致
+#     bucket: my-release-bucket
+#     accessKey: AKIA...
+#     secretKey: ...
+#     useSsl: true
+#     forcePathStyle: false
+#     prefix: appv
+#   signedUrlTtlMinutes: 15
+#
+# 说明：bucket 若不存在会在启动时自动创建；访问密钥建议用只读写该 bucket 的子账号。
+# 环境变量等价写法：APPV_STORAGE_DRIVER=s3、APPV_STORAGE_S3_ENDPOINT=... 等。
+
+# -----------------------------------------------------------------------------
+# 日志
+# -----------------------------------------------------------------------------
+log:
+  level: info            # debug | info | warn | error
+  format: text           # text | json（容器/采集环境建议 json）
+
+# -----------------------------------------------------------------------------
+# 上传限制
+# -----------------------------------------------------------------------------
+upload:
+  maxSizeMB: 4096
+  # 扩展名白名单：留空([])表示不限制；开启后只允许列出的后缀
+  allowedExtensions: []
+  # 例：allowedExtensions: [".apk", ".ipa", ".exe", ".dmg", ".zip"]
+
+# -----------------------------------------------------------------------------
+# 跨域（前后端同源部署时留空即可）
+# -----------------------------------------------------------------------------
+cors:
+  allowedOrigins: []
+  # 例：allowedOrigins: ["https://release.example.com"]

@@ -47,18 +47,39 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := database.Migrate(db, log); err != nil {
-		log.Error("执行数据库迁移失败", "error", err)
-		os.Exit(1)
-	}
-	if err := database.Seed(db, cfg, log); err != nil {
-		log.Error("初始化基础数据失败", "error", err)
-		os.Exit(1)
-	}
-
+	// -migrate-only 是运维的显式动作，不受 autoMigrate 开关影响：
+	// 它正是 database.autoMigrate=false 场景下「先建表」的那条路径。
 	if *migrateOnly {
+		if err := database.Migrate(db, log); err != nil {
+			log.Error("执行数据库迁移失败", "error", err)
+			os.Exit(1)
+		}
+		if err := database.Seed(db, cfg, log); err != nil {
+			log.Error("初始化基础数据失败", "error", err)
+			os.Exit(1)
+		}
 		log.Info("迁移完成，已按要求退出")
 		return
+	}
+
+	if cfg.Database.AutoMigrateEnabled() {
+		if err := database.Migrate(db, log); err != nil {
+			log.Error("执行数据库迁移失败", "error", err)
+			os.Exit(1)
+		}
+		if err := database.Seed(db, cfg, log); err != nil {
+			log.Error("初始化基础数据失败", "error", err)
+			os.Exit(1)
+		}
+	} else {
+		// 关闭自动迁移适用于「DBA 预先建表」或「只读副本」：建表与初始管理员都不做。
+		// 若目标库连表都没有，说明配置或部署顺序有问题，这里给出可直接执行的修复指引。
+		if !db.Migrator().HasTable("users") {
+			log.Error("已关闭自动迁移，但目标库缺少表结构；请先执行一次：" +
+				"appv -config <配置文件> -migrate-only")
+			os.Exit(1)
+		}
+		log.Warn("已关闭自动迁移（database.autoMigrate=false），跳过建表与初始管理员创建")
 	}
 
 	if *backupDir != "" {
@@ -81,8 +102,8 @@ func main() {
 			Bucket:         cfg.Storage.S3.Bucket,
 			AccessKey:      cfg.Storage.S3.AccessKey,
 			SecretKey:      cfg.Storage.S3.SecretKey,
-			UseSSL:         cfg.Storage.S3.UseSSL,
-			ForcePathStyle: cfg.Storage.S3.ForcePathStyle,
+			UseSSL:         cfg.Storage.S3.UseSSLEnabled(),
+			ForcePathStyle: cfg.Storage.S3.ForcePathStyleEnabled(),
 			Prefix:         cfg.Storage.S3.Prefix,
 		},
 		SignedURLTTL: time.Duration(cfg.Storage.SignedURLTTLMinutes) * time.Minute,

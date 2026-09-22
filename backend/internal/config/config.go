@@ -68,8 +68,14 @@ type DatabaseConfig struct {
 	DSN          string `yaml:"dsn"`  // postgres / mysql
 	MaxOpenConns int    `yaml:"maxOpenConns"`
 	MaxIdleConns int    `yaml:"maxIdleConns"`
-	AutoMigrate  bool   `yaml:"autoMigrate"`
-	LogSQL       bool   `yaml:"logSql"`
+	// AutoMigrate 用指针：需要区分“未配置”（默认启用）与“显式关闭”。
+	AutoMigrate *bool `yaml:"autoMigrate"`
+	LogSQL      bool  `yaml:"logSql"`
+}
+
+// AutoMigrateEnabled 是否在启动时自动补齐表结构，默认启用。
+func (d DatabaseConfig) AutoMigrateEnabled() bool {
+	return d.AutoMigrate == nil || *d.AutoMigrate
 }
 
 // JWTConfig 令牌配置。
@@ -92,6 +98,15 @@ type SecurityConfig struct {
 	RateLimitOpenPerMin  int `yaml:"rateLimitOpenPerMin"`
 }
 
+// UseSSLEnabled 是否使用 HTTPS 访问对象存储，默认 false。
+func (s S3Storage) UseSSLEnabled() bool { return s.UseSSL != nil && *s.UseSSL }
+
+// ForcePathStyleEnabled 是否使用 path-style 访问，默认 true（自建 MinIO 常用；
+// 连接 AWS S3 或带虚主机名的网关时应显式设为 false）。
+func (s S3Storage) ForcePathStyleEnabled() bool {
+	return s.ForcePathStyle == nil || *s.ForcePathStyle
+}
+
 // StorageConfig 存储配置，支持 local / s3（MinIO、AWS S3 及兼容实现）。
 type StorageConfig struct {
 	Driver string `yaml:"driver"`
@@ -109,13 +124,15 @@ type LocalStorage struct {
 
 // S3Storage 对象存储配置。
 type S3Storage struct {
-	Endpoint       string `yaml:"endpoint"`
-	Region         string `yaml:"region"`
-	Bucket         string `yaml:"bucket"`
-	AccessKey      string `yaml:"accessKey"`
-	SecretKey      string `yaml:"secretKey"`
-	UseSSL         bool   `yaml:"useSsl"`
-	ForcePathStyle bool   `yaml:"forcePathStyle"`
+	Endpoint  string `yaml:"endpoint"`
+	Region    string `yaml:"region"`
+	Bucket    string `yaml:"bucket"`
+	AccessKey string `yaml:"accessKey"`
+	SecretKey string `yaml:"secretKey"`
+	// UseSSL / ForcePathStyle 用指针：需要区分“未配置”（用默认值）与“显式 false”。
+	// 尤其 ForcePathStyle：自建 MinIO 通常要 true，而 AWS S3 必须 false。
+	UseSSL         *bool  `yaml:"useSsl"`
+	ForcePathStyle *bool  `yaml:"forcePathStyle"`
 	Prefix         string `yaml:"prefix"`
 }
 
@@ -150,7 +167,7 @@ func Default() *Config {
 			Path:         "./data/app_version.db",
 			MaxOpenConns: 20,
 			MaxIdleConns: 5,
-			AutoMigrate:  true,
+			AutoMigrate:  boolPtr(true),
 		},
 		JWT: JWTConfig{ExpireHours: 24, RefreshDays: 7, Issuer: "app-version-manage"},
 		Security: SecurityConfig{
@@ -163,7 +180,11 @@ func Default() *Config {
 			Driver:              StorageLocal,
 			Local:               LocalStorage{Root: "./static/uploads"},
 			SignedURLTTLMinutes: 30,
-			S3:                  S3Storage{Region: "us-east-1", ForcePathStyle: true, Prefix: "appv"},
+			S3: S3Storage{
+				Region:         "us-east-1",
+				ForcePathStyle: boolPtr(true), // 默认按自建 MinIO 的常见配置
+				Prefix:         "appv",
+			},
 		},
 		Log:    LogConfig{Level: "info", Format: "text"},
 		Upload: UploadConfig{MaxSizeMB: 4096},
@@ -229,6 +250,9 @@ func merge(base, file *Config) {
 	if file.Database.MaxIdleConns != 0 {
 		base.Database.MaxIdleConns = file.Database.MaxIdleConns
 	}
+	if file.Database.AutoMigrate != nil {
+		base.Database.AutoMigrate = file.Database.AutoMigrate
+	}
 	if file.Database.LogSQL {
 		base.Database.LogSQL = true
 	}
@@ -292,6 +316,12 @@ func merge(base, file *Config) {
 	if file.Storage.S3.SecretKey != "" {
 		base.Storage.S3.SecretKey = file.Storage.S3.SecretKey
 	}
+	if file.Storage.S3.UseSSL != nil {
+		base.Storage.S3.UseSSL = file.Storage.S3.UseSSL
+	}
+	if file.Storage.S3.ForcePathStyle != nil {
+		base.Storage.S3.ForcePathStyle = file.Storage.S3.ForcePathStyle
+	}
 	if file.Storage.S3.Prefix != "" {
 		base.Storage.S3.Prefix = file.Storage.S3.Prefix
 	}
@@ -339,7 +369,9 @@ func applyEnv(cfg *Config) {
 	cfg.Database.DSN = envString(cfg.Database.DSN, "DATABASE_DSN")
 	cfg.Database.MaxOpenConns = envInt(cfg.Database.MaxOpenConns, "DATABASE_MAX_OPEN_CONNS")
 	cfg.Database.MaxIdleConns = envInt(cfg.Database.MaxIdleConns, "DATABASE_MAX_IDLE_CONNS")
-	cfg.Database.AutoMigrate = envBool(cfg.Database.AutoMigrate, "DATABASE_AUTO_MIGRATE")
+	if v := envBoolPtr("DATABASE_AUTO_MIGRATE"); v != nil {
+		cfg.Database.AutoMigrate = v
+	}
 	cfg.Database.LogSQL = envBool(cfg.Database.LogSQL, "DATABASE_LOG_SQL")
 
 	cfg.JWT.Secret = envString(cfg.JWT.Secret, "JWT_SECRET")
@@ -358,8 +390,12 @@ func applyEnv(cfg *Config) {
 	cfg.Storage.S3.Bucket = envString(cfg.Storage.S3.Bucket, "STORAGE_S3_BUCKET")
 	cfg.Storage.S3.AccessKey = envString(cfg.Storage.S3.AccessKey, "STORAGE_S3_ACCESS_KEY")
 	cfg.Storage.S3.SecretKey = envString(cfg.Storage.S3.SecretKey, "STORAGE_S3_SECRET_KEY")
-	cfg.Storage.S3.UseSSL = envBool(cfg.Storage.S3.UseSSL, "STORAGE_S3_USE_SSL")
-	cfg.Storage.S3.ForcePathStyle = envBool(cfg.Storage.S3.ForcePathStyle, "STORAGE_S3_FORCE_PATH_STYLE")
+	if v := envBoolPtr("STORAGE_S3_USE_SSL"); v != nil {
+		cfg.Storage.S3.UseSSL = v
+	}
+	if v := envBoolPtr("STORAGE_S3_FORCE_PATH_STYLE"); v != nil {
+		cfg.Storage.S3.ForcePathStyle = v
+	}
 	cfg.Storage.S3.Prefix = envString(cfg.Storage.S3.Prefix, "STORAGE_S3_PREFIX")
 	cfg.Storage.SignedURLTTLMinutes = envInt(cfg.Storage.SignedURLTTLMinutes, "STORAGE_SIGNED_URL_TTL_MINUTES")
 
@@ -512,6 +548,22 @@ func envInt(def int, key string) int {
 		return def
 	}
 	return n
+}
+
+// boolPtr 返回布尔值指针，用于区分“未配置”与“显式 false”。
+func boolPtr(v bool) *bool { return &v }
+
+// envBoolPtr 环境变量存在且可解析时返回其值，否则返回 nil（表示未配置）。
+func envBoolPtr(key string) *bool {
+	v, ok := os.LookupEnv(EnvPrefix + key)
+	if !ok || strings.TrimSpace(v) == "" {
+		return nil
+	}
+	b, err := strconv.ParseBool(strings.TrimSpace(v))
+	if err != nil {
+		return nil
+	}
+	return &b
 }
 
 func envBool(def bool, key string) bool {

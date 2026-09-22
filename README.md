@@ -98,7 +98,31 @@ docker compose --profile s3 up -d --build         # 使用 MinIO
 
 ## 配置
 
-优先级：**代码默认值 < YAML 文件 < `APPV_` 环境变量**。完整清单见 [.env.example](.env.example)。
+优先级：**代码默认值 < YAML 文件 < `APPV_` 环境变量**。
+
+- **全量配置示例**：[backend/config.example.yaml](backend/config.example.yaml) —— 每个配置项都有说明，
+  并给出 **PostgreSQL / MySQL / MinIO / AWS S3** 的完整示例（含 DSN 写法与前置条件）。
+- 环境变量清单：[.env.example](.env.example)。
+- 生产环境建议：非敏感项写 YAML，密钥一律走环境变量。
+
+### 首次启动会自动建表吗？
+
+**会。** 具体行为：
+
+| 事项 | 是否自动 |
+| --- | --- |
+| SQLite 数据库文件 + 父目录 | ✅ 自动创建 |
+| PostgreSQL / MySQL 的**数据库本身** | ❌ 需先手工 `CREATE DATABASE` |
+| 库里的**表、索引、默认通道** | ✅ 自动创建 |
+| 初始管理员账号 | ✅ 自动创建（口令见下） |
+| S3 / MinIO 的 bucket | ✅ 不存在时自动创建 |
+| 本地存储目录 | ✅ 自动创建 |
+
+- 迁移是**只增不改**：只新增表、列、索引，不重建表、不删数据 —— 因此升级后可直接回滚旧镜像。
+- 初始管理员：设置了 `APPV_ADMIN_INITIAL_PASSWORD` 就用它，否则随机生成并在启动日志中打印一次；
+  首次登录会要求改密。
+- 想跳过自动建表：`database.autoMigrate: false`（或 `APPV_DATABASE_AUTO_MIGRATE=false`），
+  适合由 DBA 预建表或只读副本；此时请先单独跑一次 `./appv -config config.yaml -migrate-only`。
 
 常用项：
 
