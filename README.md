@@ -105,7 +105,10 @@ docker compose up -d --build
 镜像构建细节（`deploy/Dockerfile`）：
 
 - 多阶段：npm 构建前端 → go 构建后端（`appv` 与迁移工具 `appv-migrate`）→ 运行镜像（nginx + 后端）
-- 支持多架构：用 `TARGETARCH` 而不是写死 amd64，可构建 `linux/amd64,linux/arm64`
+- **构建 `linux/amd64`**。Dockerfile 用 `TARGETARCH` 而不是写死架构，手动 `--platform` 仍可构建
+  arm64；但在 amd64 机器上构建 arm64 只能靠 QEMU 模拟，前端 `tsc`/`vite` 与 `go build`
+  会被拖慢数倍（实测单是 arm64 前端阶段就 220 秒），且前端产物与架构无关、多平台时
+  还会被重复构建一遍 —— 所以 CI 里不做 arm64。真需要 arm64 镜像请用原生 arm64 runner
 - 依赖与编译使用 BuildKit cache mount，重复构建快很多（需要 BuildKit，即 `DOCKER_BUILDKIT=1`）
 - 运行镜像内只有**不含密钥**的配置模板（`deploy/config.example.yaml`），密钥一律走 `APPV_*` 环境变量；
   完整配置说明同时打进镜像：`/app/config.full-example.yaml`
@@ -256,7 +259,7 @@ CI 在每次推送/PR 时执行以上检查，规则集中在可复用的
 
 | 工作流 | 作用 |
 | --- | --- |
-| [`.github/workflows/docker-image.yml`](.github/workflows/docker-image.yml) | 过门禁 → 构建 amd64+arm64 → 推送 GHCR |
+| [`.github/workflows/docker-image.yml`](.github/workflows/docker-image.yml) | 过门禁 → 构建 linux/amd64 → 推送 GHCR |
 | [`.gitea/workflows/docker-image.yml`](.gitea/workflows/docker-image.yml) | 同上（流程完全同构），推送自建 Gitea 镜像仓库 |
 
 两条流程结构完全一致：`质量门禁 → 构建并推送`，只有镜像地址与凭据不同。

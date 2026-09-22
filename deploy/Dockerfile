@@ -10,7 +10,11 @@
 #
 # 构建示例：
 #   docker build -f deploy/Dockerfile -t app-version-manage:dev .
-#   docker buildx build --platform linux/amd64,linux/arm64 -f deploy/Dockerfile .
+#   docker buildx build --platform linux/amd64 -f deploy/Dockerfile .
+#
+# 关于 arm64：本文件支持（用 TARGETARCH 而非写死架构），但 CI 只出 amd64。
+# 在 amd64 机器上构建 arm64 需要 QEMU 模拟，前端 tsc/vite 与 go build 会慢数倍；
+# 且前端产物与架构无关，多平台构建会把它重复构建一遍。要用 arm64 请上原生 arm64 runner。
 ###############################################################################
 
 ARG NODE_VERSION=20

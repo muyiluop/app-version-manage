@@ -29,7 +29,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: docker/setup-qemu-action@v3
+      # 只构建 linux/amd64，因此不需要 QEMU：
+      # arm64 在 amd64 runner 上只能靠模拟（QEMU）执行，前端 tsc/vite 与 go build
+      # 会被拖慢数倍到数十倍；且前端产物与架构无关，多平台时会被重复构建一遍。
+      # 以后确实需要 arm64 时，应改用原生 arm64 runner，而不是在这里开模拟。
 
       - name: 配置 Buildx
         uses: docker/setup-buildx-action@v3
@@ -55,12 +58,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: 构建并推送（amd64 + arm64）
+      - name: 构建并推送（linux/amd64）
         uses: docker/build-push-action@v6
         with:
           context: .
           file: deploy/Dockerfile
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
