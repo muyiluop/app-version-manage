@@ -76,6 +76,10 @@ export default function SharePortal() {
 
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyPage, setHistoryPage] = useState(1);
+  // 历史版本要查询的平台。必须与「实际展示的那个版本」的平台一致：
+  // 主卡片在浏览器平台与版本平台不匹配时会回退到 versions[0]（见 currentVersion），
+  // 若这里仍用探测出来的平台去过滤，就会出现「卡片有数据、历史版本为空」。
+  const [historyPlatform, setHistoryPlatform] = useState<Platform | undefined>(undefined);
 
   const currentPlatform = useMemo<Platform | undefined>(
     () => normalizePlatform(payload?.currentPlatform) ?? fallbackPlatform,
@@ -129,23 +133,36 @@ export default function SharePortal() {
     };
   }, [token, attempt, storageKey]);
 
-  // 渠道与 sha256 只能从 v2 check 补全（v1 分享接口没有这两个字段）
+  // 实际对外展示的平台：优先当前平台，找不到该平台的版本时回退到第一个版本。
+  // 主卡片、v2 check、历史版本三处都必须用同一个平台，否则会出现
+  // 「卡片有数据、历史版本为空、渠道与 SHA256 为 -」这类互相矛盾的界面。
+  const displayPlatform = useMemo<Platform | undefined>(() => {
+    if (!payload) return undefined;
+    const versions = payload.versions ?? [];
+    const matched = versions.find((item) => item.platform === currentPlatform);
+    return matched?.platform ?? versions[0]?.platform ?? currentPlatform;
+  }, [payload, currentPlatform]);
+
+  // 渠道与 sha256 只能从 v2 check 补全（v1 分享接口没有这两个字段）。
+  // 平台用 displayPlatform：浏览器探测出的平台若在应用里没有版本，check 会直接失败，
+  // 表现为渠道 / SHA256 / 最低支持版本全部为空。
   const { data: checkResult } = useRequest(
-    ["share-check", payload?.app.identifier ?? "", currentPlatform ?? ""],
-    () => checkUpdate({ identifier: payload?.app.identifier ?? "", platform: currentPlatform }),
-    { enabled: stage === "ready" && Boolean(payload?.app.identifier) }
+    ["share-check", payload?.app.identifier ?? "", displayPlatform ?? ""],
+    () => checkUpdate({ identifier: payload?.app.identifier ?? "", platform: displayPlatform }),
+    { enabled: stage === "ready" && Boolean(payload?.app.identifier) && Boolean(displayPlatform) }
   );
 
   const { data: historyData, loading: historyLoading } = useRequest(
-    ["share-history", token, currentPlatform ?? "", historyPage],
+    ["share-history", token, historyPlatform ?? "", historyPage],
     () =>
       listShareVersions(token, {
         password: passwordRef.current,
-        platform: currentPlatform,
+        platform: historyPlatform,
         page: historyPage,
         pageSize: HISTORY_PAGE_SIZE,
       }),
-    { enabled: historyOpen }
+    // 平台确定之前不发请求：否则会先用错误平台查一次，得到空列表
+    { enabled: historyOpen && Boolean(historyPlatform) }
   );
 
   const [downloading, submitDownload] = useSubmit();
@@ -180,11 +197,18 @@ export default function SharePortal() {
   }
 
   const versions = payload.versions;
-  const currentVersion = versions.find((item) => item.platform === currentPlatform) ?? versions[0];
+  const currentVersion = versions.find((item) => item.platform === displayPlatform) ?? versions[0];
   const otherPlatforms = versions.filter((item) => item !== currentVersion);
   const check: CheckResult | undefined = checkResult;
   const channel = check?.channel;
   const sha256 = check?.latest.sha256;
+
+  /** 打开历史版本抽屉：显式带上目标平台，保证与卡片展示的版本一致。 */
+  const openHistory = (platform: Platform) => {
+    setHistoryPlatform(platform);
+    setHistoryPage(1);
+    setHistoryOpen(true);
+  };
 
   const handleDownload = (version: LegacyVersion) =>
     submitDownload(async () => {
@@ -199,7 +223,9 @@ export default function SharePortal() {
 
   const renderVersionMeta = (version: LegacyVersion) => (
     <Space direction="vertical" size={2} style={{ width: "100%" }}>
-      <span>发布于：{formatDateTime(version.createdAt)}</span>
+      <span>
+        发布于：{formatDateTime(version.createdAt)} · 大小：{formatBytes(version.fileSize)}
+      </span>
       {version.changelog && <pre style={{ whiteSpace: "pre-wrap", margin: 0 }}>{version.changelog}</pre>}
     </Space>
   );
@@ -287,10 +313,7 @@ export default function SharePortal() {
                 <Button
                   icon={<HistoryOutlined />}
                   size="large"
-                  onClick={() => {
-                    setHistoryPage(1);
-                    setHistoryOpen(true);
-                  }}
+                  onClick={() => openHistory(currentVersion.platform)}
                 >
                   查看历史版本
                 </Button>
@@ -312,14 +335,7 @@ export default function SharePortal() {
                   <Button key="download" type="link" onClick={() => handleDownload(version)}>
                     下载
                   </Button>,
-                  <Button
-                    key="history"
-                    type="link"
-                    onClick={() => {
-                      setHistoryPage(1);
-                      setHistoryOpen(true);
-                    }}
-                  >
+                  <Button key="history" type="link" onClick={() => openHistory(version.platform)}>
                     历史版本
                   </Button>,
                 ]}
@@ -336,7 +352,7 @@ export default function SharePortal() {
       )}
 
       <Drawer
-        title="历史版本"
+        title={historyPlatform ? `历史版本 · ${platformLabel(historyPlatform)}` : "历史版本"}
         placement={deviceType === "mobile" ? "bottom" : "right"}
         open={historyOpen}
         onClose={() => setHistoryOpen(false)}
