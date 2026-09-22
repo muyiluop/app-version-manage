@@ -6,8 +6,7 @@ name: Build and Push Image (Gitea)
 #   2. 凭据：使用 GITEA_TOKEN（兼容原有的 DOCKERHUB_TOKEN 名称）
 #
 # 构建方式与 GitHub 完全相同：docker/setup-buildx-action + docker/build-push-action，
-# 编译在隔离的 BuildKit 构建容器（docker-container driver）内完成，
-# 不在 runner 宿主机上执行 docker build，也不依赖宿主机的构建缓存。
+# 不使用手写的 docker build / docker push 命令。
 on:
   release:
     types: [published]
@@ -94,7 +93,7 @@ jobs:
 
       - uses: docker/setup-qemu-action@v3
 
-      - name: 配置 Buildx（隔离的构建容器，不用宿主机构建缓存）
+      - name: 配置 Buildx
         uses: docker/setup-buildx-action@v3
         with:
           driver: docker-container

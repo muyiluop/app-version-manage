@@ -34,7 +34,7 @@ jobs:
 
       - uses: docker/setup-qemu-action@v3
 
-      - name: 配置 Buildx（隔离的构建容器，不用宿主机构建缓存）
+      - name: 配置 Buildx
         uses: docker/setup-buildx-action@v3
         with:
           driver: docker-container

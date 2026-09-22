@@ -211,9 +211,9 @@ CI 在每次推送/PR 时执行以上检查，规则集中在可复用的
 | [`.github/workflows/docker-image.yml`](.github/workflows/docker-image.yml) | 过门禁 → 构建 amd64+arm64 → 推送 GHCR → **起容器做冒烟验证** |
 | [`.gitea/workflows/docker-image.yml`](.gitea/workflows/docker-image.yml) | 同上（流程完全同构），推送自建 Gitea 镜像仓库 |
 
-两条流程结构完全一致：`门禁 → buildx 构建并推送 → 起容器冒烟`，只有镜像地址与凭据不同。
-构建统一走 `docker/setup-buildx-action` + `docker/build-push-action`（`docker-container` driver），
-编译在隔离的 BuildKit 构建容器内完成，**不在 runner 宿主机上执行 `docker build`**。
+两条流程结构完全一致：`门禁 → 构建并推送 → 起容器冒烟`，只有镜像地址与凭据不同。
+构建与推送统一通过 `docker/setup-buildx-action` + `docker/build-push-action` 完成，
+**不使用手写的 `docker build` / `docker push` 命令**。
 
 两条流程的冒烟验证都会真正启动镜像，检查 `/readyz` 并调用一次登录接口 ——
 用于确认「自动建表 + 初始管理员 + 鉴权链路」在容器里确实可用。
