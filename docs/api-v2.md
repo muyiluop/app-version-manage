@@ -137,9 +137,9 @@
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | POST | `/api/auth/login` | → `{token,user:{id,username,role}}` |
-| GET | `/api/open/latest?identifier=&platform=&channel=&format=` | 扁平 JSON：`appName,appId,identifier,version,platform,channel,changelog,isForce,fileName,filePath,fileSize,createdAt`；`filePath` 为下载令牌；`format` 命中模板时按模板 Content-Type 输出 |
+| GET | `/api/open/latest?identifier=&platform=&channel=&format=` | 扁平 JSON：`appName,appId,identifier,version,platform,channel,changelog,isForce,fileName,filePath,fileSize,sha256,createdAt`；`filePath` 为下载令牌；`format` 命中模板时按模板 Content-Type 输出 |
 | GET | `/api/open/changelog?identifier=&platform=&channel=` | 数组：`{createdAt,version,platform,changelog}` |
-| GET | `/api/open/check?identifier=&platform=&channel=&currentVersion=` | 扁平：`hasUpdate,isForce,belowMinimumVersion,minSupportedVersion,version,changelog,fileName,filePath,fileSize,createdAt` |
+| GET | `/api/open/check?identifier=&platform=&channel=&currentVersion=` | 扁平：`hasUpdate,isForce,belowMinimumVersion,minSupportedVersion,version,changelog,fileName,filePath,fileSize,sha256,createdAt` |
 | GET | `/api/open/download/:token` | 传统下载，支持 302 跳转（S3） |
 | POST | `/api/share/:token` | body `{password?}`；无密码→`{app,versions,currentPlatform}`；需密码 → **HTTP 209** `{error,requirePassword:true}` |
 | POST | `/api/share/:token/versions` | 同上鉴权，返回 `{total,list,page,pageSize}`，`list[].filePath` 为下载令牌 |
@@ -150,6 +150,9 @@
 `{identifier,platform,channel,currentVersion,hasUpdate,forceUpdate,belowMinimumVersion,minSupportedVersion,latest:{version,channel,platform,changelog,forceUpdate,publishedAt,fileName,fileSize,sha256,downloadUrl}}`
 
 规则：`channel` 缺省用应用默认通道；`currentVersion` 缺省视为需要更新；`belowMinimumVersion` 为真时同时置 `forceUpdate=true`。
+
+> `sha256` 在 v1 兼容与 v2 两套开放接口中**字段名一致**（均为 `sha256`，值可能为空字符串），
+> 客户端可据此校验下载产物完整性：v1 兼容侧是扁平字段，v2 侧位于 `latest.sha256`。
 
 ## 7. 其他
 

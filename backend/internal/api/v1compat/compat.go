@@ -168,7 +168,9 @@ func (h *Handler) GetLatestVersion(c *gin.Context) {
 		"fileName":   version.FileName,
 		"filePath":   h.svc.File.SignDownload(version.FileKey),
 		"fileSize":   version.FileSize,
-		"createdAt":  version.CreatedAt.Format(time.RFC3339),
+		// 与 v2 开放接口同名，便于客户端下载后校验产物完整性
+		"sha256":    version.FileSHA256,
+		"createdAt": version.CreatedAt.Format(time.RFC3339),
 	})
 }
 
@@ -234,7 +236,9 @@ func (h *Handler) CheckUpdate(c *gin.Context) {
 		"fileName":            latest.FileName,
 		"filePath":            strings.TrimPrefix(latest.DownloadURL, "/api/open/download/"),
 		"fileSize":            latest.FileSize,
-		"createdAt":           formatTime(latest.PublishedAt),
+		// 与 v2 开放接口同名，便于客户端下载后校验产物完整性
+		"sha256":    latest.SHA256,
+		"createdAt": formatTime(latest.PublishedAt),
 	})
 }
 
