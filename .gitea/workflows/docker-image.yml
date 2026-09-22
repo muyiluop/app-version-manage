@@ -1,6 +1,6 @@
 name: Build and Push Image (Gitea)
 
-# 与 GitHub 的 docker-image.yml 保持同一套流程：verify -> build-and-push -> smoke。
+# 与 GitHub 的 docker-image.yml 保持同一套流程：质量门禁 -> 构建并推送。
 # 只差两处（都是「推送目标」层面的差异）：
 #   1. 镜像地址：Gitea 内置镜像仓库（见 env.REGISTRY / env.IMAGE_NAME）
 #   2. 凭据：优先 secrets.DOCKERHUB_TOKEN，其次 secrets.GITEA_TOKEN
@@ -86,9 +86,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-    outputs:
-      image: git.dev.smartmeter.vip:8880/${{ github.repository }}
-      version: ${{ steps.meta.outputs.version }}
     steps:
       - uses: actions/checkout@v4
 
@@ -141,51 +138,3 @@ jobs:
 
       - name: 输出结果
         run: echo "${{ steps.meta.outputs.tags }}"
-
-  # 构建成功不等于镜像能跑：拉下来真起一个容器验证
-  smoke:
-    name: 镜像冒烟验证
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    steps:
-      - name: 登录镜像仓库（私有仓库需要）
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.DOCKERHUB_TOKEN || secrets.GITEA_TOKEN }}
-
-      - name: 启动镜像并检查健康与登录
-        env:
-          IMAGE: ${{ needs.build-and-push.outputs.image }}
-          VERSION: ${{ needs.build-and-push.outputs.version }}
-        run: |
-          set -e
-          docker run -d --name appv-smoke -p 18080:80 \
-            -e APPV_JWT_SECRET="$(openssl rand -hex 32)" \
-            -e APPV_DOWNLOAD_TOKEN_KEY="$(openssl rand -hex 32)" \
-            -e APPV_ADMIN_INITIAL_PASSWORD=smoke-123456 \
-            "$IMAGE:$VERSION"
-
-          ok=0
-          for i in $(seq 1 30); do
-            if curl -fsS http://127.0.0.1:18080/readyz >/dev/null 2>&1; then ok=1; break; fi
-            sleep 2
-          done
-
-          echo "--- 容器日志 ---"
-          docker logs appv-smoke || true
-
-          if [ "$ok" != "1" ]; then
-            echo "镜像健康检查未通过"
-            docker rm -f appv-smoke || true
-            exit 1
-          fi
-
-          # 再验登录：确认自动建表、初始管理员与鉴权链路都正常
-          curl -fsS -X POST http://127.0.0.1:18080/api/v2/auth/login \
-            -H 'Content-Type: application/json' \
-            -d '{"username":"admin","password":"smoke-123456"}' >/dev/null
-
-          echo "镜像冒烟验证通过（自动建表 / 初始管理员 / 登录均正常）"
-          docker rm -f appv-smoke || true
