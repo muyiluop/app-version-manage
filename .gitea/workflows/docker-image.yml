@@ -1,11 +1,13 @@
-name: Build and Push Docker Image
+name: Build and Push Image (Gitea)
 
-# 发布镜像：打 release 时构建并推送到 Gitea 内置镜像仓库，随后起容器做冒烟验证。
+# 与 GitHub 的 docker-image.yml 保持同一套流程：verify -> build-and-push -> smoke。
+# 只差两处（都是「推送目标」层面的差异）：
+#   1. 镜像地址：Gitea 内置镜像仓库（见 env.REGISTRY / env.IMAGE_NAME）
+#   2. 凭据：使用 GITEA_TOKEN（兼容原有的 DOCKERHUB_TOKEN 名称）
 #
-# 说明：
-#   · 质量门禁（gofmt/vet/测试/前端类型检查）在 .github/workflows/verify.yml 中定义，
-#     Gitea 侧不重复实现；本流程自身也会编译前后端，编译不过同样会被拦住；
-#   · 构建使用 BuildKit（Dockerfile 里有 cache mount），因此显式设置 DOCKER_BUILDKIT=1。
+# 构建方式与 GitHub 完全相同：docker/setup-buildx-action + docker/build-push-action，
+# 编译在隔离的 BuildKit 构建容器（docker-container driver）内完成，
+# 不在 runner 宿主机上执行 docker build，也不依赖宿主机的构建缓存。
 on:
   release:
     types: [published]
@@ -16,7 +18,6 @@ on:
         required: false
         default: ""
 
-# 同一 ref 的镜像构建串行执行，避免并发推送互相覆盖
 concurrency:
   group: image-gitea-${{ github.ref }}
   cancel-in-progress: false
@@ -28,79 +29,143 @@ env:
   IMAGE_NAME: git.dev.smartmeter.vip:8880/${{ github.repository }}
 
 jobs:
+  # 质量门禁：与 .github/workflows/verify.yml 中的命令保持一致
+  # （Gitea 对 reusable workflow 的支持视版本而定，这里内联同一套检查，
+  #   改动规则时请两处同步；若你的 Gitea >= 1.23 也可改成 uses: ./.github/workflows/verify.yml）
+  backend-check:
+    name: 后端（gofmt / vet / 测试）
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: gofmt 检查
+        run: |
+          unformatted=$(gofmt -l ./cmd ./internal)
+          if [ -n "$unformatted" ]; then
+            echo "以下文件未格式化："
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - run: go vet ./...
+      - name: 单元测试（含竞态检测）
+        run: go test -race ./...
+
+  frontend-check:
+    name: 前端（类型 / 测试 / lint / 构建）
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run test
+      - run: npm run lint
+      - run: npm run build
+
   build-and-push:
+    needs: [backend-check, frontend-check]
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+    outputs:
+      image: git.dev.smartmeter.vip:8880/${{ github.repository }}
+      version: ${{ steps.meta.outputs.version }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: 解析版本标签
-        id: vars
-        run: |
-          if [ -n "${{ github.event.release.tag_name }}" ]; then
-            TAG="${{ github.event.release.tag_name }}"
-            PRERELEASE="${{ github.event.release.prerelease }}"
-          elif [ -n "${{ github.event.inputs.version }}" ]; then
-            TAG="${{ github.event.inputs.version }}"
-            PRERELEASE="false"
-          else
-            TAG="latest"
-            PRERELEASE="true"
-          fi
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
-          echo "prerelease=$PRERELEASE" >> $GITHUB_OUTPUT
-          echo "构建标签：$TAG（预发布=$PRERELEASE）"
+      - uses: docker/setup-qemu-action@v3
+
+      - name: 配置 Buildx（隔离的构建容器，不用宿主机构建缓存）
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker-container
+
+      - name: 生成镜像标签与 OCI 标签
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=ref,event=tag
+            type=raw,value=${{ github.event.inputs.version }},enable=${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version != '' }}
+            # 只有正式发布才移动 latest，避免预发布把 latest 指到测试版本
+            type=raw,value=latest,enable=${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'release' && !github.event.release.prerelease) }}
 
       - name: 登录 Gitea 镜像仓库
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
-          # 优先 GITEA_TOKEN，兼容原先使用的 DOCKERHUB_TOKEN 名称
           password: ${{ secrets.GITEA_TOKEN || secrets.DOCKERHUB_TOKEN }}
 
-      - name: 构建镜像
+      - name: 构建并推送（amd64 + arm64）
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ steps.meta.outputs.version }}
+            REVISION=${{ github.sha }}
+          # Gitea 没有 GHA 缓存后端；如你的 registry 支持 OCI 缓存清单，
+          # 可放开下面两行以加速重复构建：
+          # cache-from: type=registry,ref=${{ env.IMAGE_NAME }}:buildcache
+          # cache-to: type=registry,ref=${{ env.IMAGE_NAME }}:buildcache,mode=max
+          # 不使用 provenance/sbom 附加证明：部分自建 registry 对附属清单支持不完整
+          provenance: false
+          sbom: false
+
+      - name: 输出结果
+        run: echo "${{ steps.meta.outputs.tags }}"
+
+  # 构建成功不等于镜像能跑：拉下来真起一个容器验证
+  smoke:
+    name: 镜像冒烟验证
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: 登录镜像仓库（私有仓库需要）
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITEA_TOKEN || secrets.DOCKERHUB_TOKEN }}
+
+      - name: 启动镜像并检查健康与登录
         env:
-          DOCKER_BUILDKIT: "1"
+          IMAGE: ${{ needs.build-and-push.outputs.image }}
+          VERSION: ${{ needs.build-and-push.outputs.version }}
         run: |
           set -e
-          TAG="${{ steps.vars.outputs.tag }}"
-          # 用宿主机原生 docker（自建 runner 上最省事）
-          docker build \
-            --pull \
-            --build-arg VERSION="$TAG" \
-            --build-arg REVISION="${{ github.sha }}" \
-            -t "${{ env.IMAGE_NAME }}:$TAG" \
-            -f deploy/Dockerfile .
-          docker images "${{ env.IMAGE_NAME }}"
-
-      - name: 推送镜像
-        run: |
-          set -e
-          TAG="${{ steps.vars.outputs.tag }}"
-          docker push "${{ env.IMAGE_NAME }}:$TAG"
-
-          # 只有正式发布才移动 latest，避免预发布把 latest 指向测试版本
-          if [ "${{ steps.vars.outputs.prerelease }}" != "true" ] && [ "$TAG" != "latest" ]; then
-            docker tag "${{ env.IMAGE_NAME }}:$TAG" "${{ env.IMAGE_NAME }}:latest"
-            docker push "${{ env.IMAGE_NAME }}:latest"
-            echo "已同时更新 latest"
-          fi
-
-      - name: 冒烟验证（起容器 + 健康检查 + 登录）
-        run: |
-          set -e
-          TAG="${{ steps.vars.outputs.tag }}"
-          IMAGE="${{ env.IMAGE_NAME }}:$TAG"
-
-          docker rm -f appv-smoke >/dev/null 2>&1 || true
           docker run -d --name appv-smoke -p 18080:80 \
             -e APPV_JWT_SECRET="$(openssl rand -hex 32)" \
             -e APPV_DOWNLOAD_TOKEN_KEY="$(openssl rand -hex 32)" \
             -e APPV_ADMIN_INITIAL_PASSWORD=smoke-123456 \
-            "$IMAGE"
+            "$IMAGE:$VERSION"
 
           ok=0
           for i in $(seq 1 30); do
@@ -124,7 +189,3 @@ jobs:
 
           echo "镜像冒烟验证通过（自动建表 / 初始管理员 / 登录均正常）"
           docker rm -f appv-smoke || true
-
-      - name: 输出结果
-        run: |
-          echo "已推送：${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.tag }}"

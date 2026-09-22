@@ -33,7 +33,11 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
+
+      - name: 配置 Buildx（隔离的构建容器，不用宿主机构建缓存）
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker-container
 
       - name: 生成镜像标签与 OCI 标签
         id: meta
@@ -80,6 +84,14 @@ jobs:
     needs: build-and-push
     runs-on: ubuntu-latest
     steps:
+      # 镜像可能是私有包，冒烟前必须登录，否则 docker run 会拉取失败
+      - name: 登录 GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: 启动镜像并检查健康与登录
         env:
           IMAGE: ${{ needs.build-and-push.outputs.image }}
