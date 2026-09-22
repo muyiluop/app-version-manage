@@ -61,10 +61,23 @@ docs/                    方案与接口文档
 ### 后端（开发）
 
 ```bash
+cp .env.example .env      # 环境相关配置（连接串、密钥、内网地址）都放这里，不入库
 cd backend
 go run ./cmd/server -config config.yaml
 # 默认监听 http://localhost:9080
 ```
+
+**配置分两层，避免密钥进仓库：**
+
+| 文件 | 放什么 | 是否入库 |
+| --- | --- | --- |
+| `config.yaml` | 非敏感默认值（端口、驱动类型、日志级别、上传上限） | ✅ 入库 |
+| `.env` | 连接串、密钥、内网地址等**环境相关**信息 | ❌ 已被 .gitignore 忽略 |
+
+后端启动时会自动载入 `.env`（依次尝试 `APPV_ENV_FILE` → `./.env` → `../.env`，
+即在 `backend/` 下直接 `go run` 也能读到仓库根目录的 `.env`），
+也可显式指定 `-env-file /path/to/.env`。**优先级：真实环境变量 > `.env` > `config.yaml` > 代码默认值** ——
+已存在的环境变量不会被 `.env` 覆盖，所以 CI/容器里注入的值始终优先。
 
 首次启动会自动建表、迁移历史数据并创建管理员账号：
 

@@ -3,7 +3,8 @@ name: Build and Push Image (Gitea)
 # 与 GitHub 的 docker-image.yml 保持同一套流程：verify -> build-and-push -> smoke。
 # 只差两处（都是「推送目标」层面的差异）：
 #   1. 镜像地址：Gitea 内置镜像仓库（见 env.REGISTRY / env.IMAGE_NAME）
-#   2. 凭据：使用 GITEA_TOKEN（兼容原有的 DOCKERHUB_TOKEN 名称）
+#   2. 凭据：优先 secrets.DOCKERHUB_TOKEN，其次 secrets.GITEA_TOKEN
+#      （沿用仓库里既有的 secret 名称，无需新建）
 #
 # 构建方式与 GitHub 完全相同：docker/setup-buildx-action + docker/build-push-action，
 # 不使用手写的 docker build / docker push 命令。
@@ -116,7 +117,7 @@ jobs:
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
-          password: ${{ secrets.GITEA_TOKEN || secrets.DOCKERHUB_TOKEN }}
+          password: ${{ secrets.DOCKERHUB_TOKEN || secrets.GITEA_TOKEN }}
 
       - name: 构建并推送（amd64 + arm64）
         uses: docker/build-push-action@v6
@@ -152,7 +153,7 @@ jobs:
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
-          password: ${{ secrets.GITEA_TOKEN || secrets.DOCKERHUB_TOKEN }}
+          password: ${{ secrets.DOCKERHUB_TOKEN || secrets.GITEA_TOKEN }}
 
       - name: 启动镜像并检查健康与登录
         env:

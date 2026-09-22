@@ -13,6 +13,9 @@ services:
     image: app-version-manage:v2
     container_name: appv
     restart: unless-stopped
+    # 把根目录 .env 里的变量完整注入容器（下面 environment 里的显式映射优先级更高）
+    env_file:
+      - .env
     # 后端自带优雅退出（最多 15s），默认 10s 会被 Docker 强杀，这里放宽
     stop_grace_period: 30s
     ports:

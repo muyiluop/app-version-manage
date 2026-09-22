@@ -25,8 +25,17 @@ import (
 func main() {
 	configPath := flag.String("config", "config.yaml", "配置文件路径")
 	migrateOnly := flag.Bool("migrate-only", false, "仅执行数据库迁移后退出")
+	envFile := flag.String("env-file", "", "环境变量文件路径（默认依次尝试 APPV_ENV_FILE、./.env、../.env）")
 	backupDir := flag.String("backup", "", "将数据库在线备份到指定目录后退出（仅 sqlite）")
 	flag.Parse()
+
+	// 先载入环境文件，再读配置：优先级 真实环境变量 > 环境文件 > YAML > 代码默认值。
+	// 这样本地开发只需一份 .env（不入库），配置文件里不再出现任何明文密钥。
+	envResult, envErr := config.LoadDotEnv(config.EnvFileCandidates(*envFile))
+	if envErr != nil {
+		slog.Error("加载环境文件失败", "error", envErr)
+		os.Exit(1)
+	}
 
 	cfg, err := config.Load(*configPath)
 	if err != nil {
@@ -36,6 +45,10 @@ func main() {
 	}
 
 	log := logger.Init(cfg.Log.Level, cfg.Log.Format)
+	if envResult.Path != "" {
+		log.Info("已载入环境文件", "file", envResult.Path,
+			"loaded", envResult.Loaded, "skipped", envResult.Skipped)
+	}
 	log.Info("配置加载完成", "config", cfg.Redacted())
 	for _, name := range cfg.GeneratedSecrets() {
 		log.Warn("开发模式检测到缺失密钥，已临时随机生成（重启后失效，生产环境请显式配置）", "key", name)

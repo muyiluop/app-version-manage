@@ -31,6 +31,7 @@ func main() {
 	srcDB := flag.String("src-db", "", "旧 SQLite 数据库文件路径（必填）")
 	srcFiles := flag.String("src-files", "", "旧上传目录（可选；不填则只迁数据不搬文件）")
 	configPath := flag.String("config", "config.yaml", "目标配置：数据库与存储（可被 APPV_* 环境变量覆盖）")
+	envFile := flag.String("env-file", "", "环境变量文件路径（默认依次尝试 APPV_ENV_FILE、./.env、../.env）")
 	dryRun := flag.Bool("dry-run", false, "只输出迁移计划与统计，不写入任何数据")
 	overwrite := flag.Bool("overwrite", false, "目标库非空时先清空目标库业务数据")
 	keepOldKeys := flag.Bool("keep-old-keys", false, "保留旧对象键：只复制文件到新存储，不重写版本/图标引用")
@@ -44,6 +45,13 @@ func main() {
 		os.Exit(2)
 	}
 
+	// 与 server 一致：先环境文件、后配置文件，避免把密钥写进 YAML
+	envResult, envErr := config.LoadDotEnv(config.EnvFileCandidates(*envFile))
+	if envErr != nil {
+		fmt.Fprintf(os.Stderr, "加载环境文件失败: %v\n", envErr)
+		os.Exit(1)
+	}
+
 	cfg, err := config.Load(*configPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "加载目标配置失败: %v\n", err)
@@ -51,6 +59,10 @@ func main() {
 	}
 
 	log := logger.Init(cfg.Log.Level, cfg.Log.Format)
+	if envResult.Path != "" {
+		log.Info("已载入环境文件", "file", envResult.Path,
+			"loaded", envResult.Loaded, "skipped", envResult.Skipped)
+	}
 	log.Info("迁移目标已就绪",
 		"database", cfg.Database.Driver,
 		"storage", cfg.Storage.Driver,
